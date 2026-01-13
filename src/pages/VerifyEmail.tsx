@@ -146,9 +146,14 @@ export function VerifyEmail() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="space-y-4">
-            <p className="text-sm text-center text-muted-foreground">
-              Enter the verification code from your email
-            </p>
+            <div className="text-center space-y-1">
+              <p className="text-sm text-muted-foreground">
+                Enter the verification code from your email
+              </p>
+              <p className="text-xs text-muted-foreground/80">
+                Can't find it? Check your spam or junk folder
+              </p>
+            </div>
             
             <CodeInput 
               length={8}

@@ -187,6 +187,9 @@ export function ResetPassword() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Verification Code</Label>
+                <p className="text-xs text-muted-foreground/80">
+                  Can't find the email? Check your spam or junk folder
+                </p>
                 <CodeInput 
                   length={8}
                   onComplete={handleCodeComplete} 

@@ -1,10 +1,12 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
-import { LogOut, User, Shield, Video, Crown, Sparkles } from 'lucide-react';
+import { LogOut, User, Shield, Video, Crown, Sparkles, Menu, X } from 'lucide-react';
+import { useState } from 'react';
 
 export function Navbar() {
   const { user, isAuthenticated, isAdmin, signOut } = useAuth();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <nav className="sticky top-0 z-50 border-b border-white/10 bg-slate-900/80 backdrop-blur-xl supports-[backdrop-filter]:bg-slate-900/60">
@@ -40,7 +42,8 @@ export function Navbar() {
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
               <>
-                <Link to="/dashboard">
+                {/* Desktop menu items */}
+                <Link to="/dashboard" className="hidden md:block">
                   <Button variant="ghost" size="sm" className="text-gray-300 hover:text-white hover:bg-white/10">
                     <User className="h-4 w-4 mr-2" />
                     Dashboard
@@ -50,7 +53,7 @@ export function Navbar() {
                   variant="ghost" 
                   size="sm" 
                   onClick={() => signOut()}
-                  className="text-gray-300 hover:text-white hover:bg-white/10"
+                  className="hidden md:flex text-gray-300 hover:text-white hover:bg-white/10"
                 >
                   <LogOut className="h-4 w-4 mr-2" />
                   Logout
@@ -79,6 +82,20 @@ export function Navbar() {
                     )}
                   </div>
                 )}
+                
+                {/* Mobile hamburger menu button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                  className="md:hidden text-gray-300 hover:text-white hover:bg-white/10"
+                >
+                  {mobileMenuOpen ? (
+                    <X className="h-5 w-5" />
+                  ) : (
+                    <Menu className="h-5 w-5" />
+                  )}
+                </Button>
               </>
             ) : (
               <>
@@ -97,6 +114,68 @@ export function Navbar() {
             )}
           </div>
         </div>
+
+        {/* Mobile menu */}
+        {isAuthenticated && mobileMenuOpen && (
+          <div className="md:hidden border-t border-white/10">
+            <div className="px-4 py-4 space-y-3 bg-slate-900/95 backdrop-blur-xl">
+              {/* User status badge - mobile */}
+              {user && (
+                <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 backdrop-blur-sm border border-white/10">
+                  <span className="text-gray-400 text-xs">Status:</span>
+                  {user.membership_status === 'premium' ? (
+                    <div className="flex items-center gap-1.5">
+                      <Crown className="h-3.5 w-3.5 text-yellow-400" />
+                      <span className="font-semibold bg-gradient-to-r from-yellow-400 to-orange-400 bg-clip-text text-transparent">
+                        Premium
+                      </span>
+                    </div>
+                  ) : user.membership_status === 'pending' ? (
+                    <div className="flex items-center gap-1.5">
+                      <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
+                      <span className="font-medium text-yellow-400">
+                        Pending
+                      </span>
+                    </div>
+                  ) : (
+                    <span className="font-medium text-gray-400 capitalize text-sm">
+                      {user.membership_status}
+                    </span>
+                  )}
+                </div>
+              )}
+
+              {/* Menu items */}
+              <Link to="/dashboard" onClick={() => setMobileMenuOpen(false)}>
+                <Button variant="ghost" className="w-full justify-start text-gray-300 hover:text-white hover:bg-white/10">
+                  <User className="h-4 w-4 mr-2" />
+                  Dashboard
+                </Button>
+              </Link>
+
+              {isAdmin && (
+                <Link to="/admin" onClick={() => setMobileMenuOpen(false)}>
+                  <Button variant="ghost" className="w-full justify-start text-gray-300 hover:text-white hover:bg-white/10">
+                    <Shield className="h-4 w-4 mr-2" />
+                    Admin
+                  </Button>
+                </Link>
+              )}
+
+              <Button 
+                variant="ghost" 
+                onClick={() => {
+                  setMobileMenuOpen(false);
+                  signOut();
+                }}
+                className="w-full justify-start text-gray-300 hover:text-white hover:bg-white/10"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Logout
+              </Button>
+            </div>
+          </div>
+        )}
       </div>
     </nav>
   );

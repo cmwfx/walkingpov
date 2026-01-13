@@ -1,5 +1,6 @@
 import express from 'express';
 import cors from 'cors';
+import compression from 'compression';
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -22,12 +23,31 @@ app.use(cors({
   credentials: true
 }));
 
+// Enable GZIP/Brotli compression
+app.use(compression({
+  filter: (req, res) => {
+    if (req.headers['x-no-compression']) {
+      return false;
+    }
+    return compression.filter(req, res);
+  },
+  level: 6
+}));
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded files statically
+// Serve uploaded files statically with caching
 const uploadDir = process.env.UPLOAD_DIR || './uploads';
-app.use('/uploads', express.static(path.resolve(uploadDir)));
+app.use('/uploads', express.static(path.resolve(uploadDir), {
+  maxAge: '1y', // Cache for 1 year
+  immutable: true,
+  setHeaders: (res, filePath) => {
+    // Set cache control headers
+    res.set('Cache-Control', 'public, max-age=31536000, immutable');
+    res.set('Vary', 'Accept-Encoding');
+  }
+}));
 
 // Routes
 app.use('/api/upload', uploadRoutes);

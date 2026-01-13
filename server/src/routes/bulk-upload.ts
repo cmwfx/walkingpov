@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 import { verifyToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
 import fetch from 'node-fetch';
+import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
@@ -46,21 +47,40 @@ async function downloadImage(imageUrl: string, uploadDir: string, baseUrl: strin
     const buffer = await response.buffer();
     
     // Generate unique filename
-    const ext = path.extname(new URL(imageUrl).pathname) || '.jpg';
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
-    const filename = `thumbnail-${uniqueSuffix}${ext}`;
-    const filepath = path.join(uploadDir, filename);
+    const baseFilename = `thumbnail-${uniqueSuffix}`;
 
     // Ensure upload directory exists
     if (!fs.existsSync(uploadDir)) {
       fs.mkdirSync(uploadDir, { recursive: true });
     }
 
-    // Save file
-    fs.writeFileSync(filepath, buffer);
+    // Define responsive image sizes
+    const sizes = [
+      { width: 400, suffix: 'small' },
+      { width: 800, suffix: 'medium' },
+      { width: 1200, suffix: 'large' }
+    ];
 
-    // Return full URL instead of relative path
-    return `${baseUrl}/uploads/${filename}`;
+    // Process and generate images in multiple formats and sizes
+    for (const size of sizes) {
+      const height = Math.round(size.width * 9 / 16); // 16:9 aspect ratio
+
+      // Generate WebP version
+      await sharp(buffer)
+        .resize(size.width, height, { fit: 'cover', position: 'center' })
+        .webp({ quality: 85 })
+        .toFile(path.join(uploadDir, `${baseFilename}-${size.suffix}.webp`));
+
+      // Generate AVIF version
+      await sharp(buffer)
+        .resize(size.width, height, { fit: 'cover', position: 'center' })
+        .avif({ quality: 80 })
+        .toFile(path.join(uploadDir, `${baseFilename}-${size.suffix}.avif`));
+    }
+
+    // Return the medium WebP URL as the primary thumbnail
+    return `${baseUrl}/uploads/${baseFilename}-medium.webp`;
   } catch (error) {
     console.error('Image download error:', error);
     throw new Error(`Failed to download image from ${imageUrl}`);

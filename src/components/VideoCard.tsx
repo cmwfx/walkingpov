@@ -1,26 +1,90 @@
 import { Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
 import type { Video } from '@/lib/supabase';
 import { Card } from '@/components/ui/card';
 import { Clock, Tag, Play, Sparkles } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { getResponsiveImageUrls, generateSrcSet, getPrimaryImageUrl } from '@/lib/imageUtils';
 
 interface VideoCardProps {
   video: Video;
 }
 
 export function VideoCard({ video }: VideoCardProps) {
+  const [imageSrc, setImageSrc] = useState<string>('');
+  const [imageLoaded, setImageLoaded] = useState(false);
+  const imgRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!imgRef.current) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            setImageSrc(video.thumbnail_url);
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      {
+        rootMargin: '50px', // Start loading 50px before entering viewport
+        threshold: 0.01
+      }
+    );
+
+    observer.observe(imgRef.current);
+
+    return () => observer.disconnect();
+  }, [video.thumbnail_url]);
+
+  const responsiveUrls = getResponsiveImageUrls(video.thumbnail_url);
+  const primaryUrl = getPrimaryImageUrl(video.thumbnail_url);
+
   return (
     <Link to={`/video/${video.id}`} className="group block">
       <Card className="overflow-hidden border-white/10 bg-white/5 backdrop-blur-sm hover:bg-white/10 transition-all duration-500 hover:scale-[1.02] hover:shadow-2xl hover:shadow-purple-500/30 h-full">
         {/* Large Thumbnail Section */}
-        <div className="aspect-[16/10] relative overflow-hidden bg-gradient-to-br from-purple-900/20 to-blue-900/20">
-          {/* Thumbnail Image */}
-          <img
-            src={video.thumbnail_url}
-            alt={video.title}
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-            loading="lazy"
-          />
+        <div ref={imgRef} className="aspect-[16/10] relative overflow-hidden bg-gradient-to-br from-purple-900/20 to-blue-900/20">
+          {/* Blur placeholder */}
+          {!imageLoaded && imageSrc && (
+            <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-blue-900/40 animate-pulse" />
+          )}
+          
+          {/* Thumbnail Image with responsive sources */}
+          {imageSrc && responsiveUrls ? (
+            <picture>
+              <source
+                type="image/avif"
+                srcSet={generateSrcSet(responsiveUrls, 'avif')}
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              />
+              <source
+                type="image/webp"
+                srcSet={generateSrcSet(responsiveUrls, 'webp')}
+                sizes="(max-width: 768px) 100vw, (max-width: 1024px) 50vw, 33vw"
+              />
+              <img
+                src={primaryUrl}
+                alt={video.title}
+                className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-105 ${
+                  imageLoaded ? 'opacity-100' : 'opacity-0'
+                }`}
+                onLoad={() => setImageLoaded(true)}
+                onError={() => setImageLoaded(true)}
+              />
+            </picture>
+          ) : imageSrc ? (
+            <img
+              src={imageSrc}
+              alt={video.title}
+              className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-105 ${
+                imageLoaded ? 'opacity-100' : 'opacity-0'
+              }`}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageLoaded(true)}
+            />
+          ) : null}
           
           {/* Gradient Overlays */}
           <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-70" />

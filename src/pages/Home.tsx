@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { VideoGrid } from '@/components/VideoGrid';
 import { VideoGridSkeleton } from '@/components/VideoSkeleton';
 import { Pagination } from '@/components/Pagination';
@@ -9,13 +10,23 @@ import { Search, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 export function Home() {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [videos, setVideos] = useState<Video[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [searchTag, setSearchTag] = useState('');
-  const [filterTag, setFilterTag] = useState('');
   const { toast } = useToast();
+
+  // Read initial state from URL
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const filterTag = searchParams.get('tag') || '';
+
+  useEffect(() => {
+    // Sync search input with URL filter tag
+    if (filterTag) {
+      setSearchTag(filterTag);
+    }
+  }, [filterTag]);
 
   useEffect(() => {
     fetchVideos(currentPage, filterTag);
@@ -40,19 +51,24 @@ export function Home() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setFilterTag(searchTag);
-    setCurrentPage(1);
+    const newParams = new URLSearchParams();
+    if (searchTag) {
+      newParams.set('tag', searchTag);
+    }
+    newParams.set('page', '1');
+    setSearchParams(newParams);
   };
 
   const handlePageChange = (page: number) => {
-    setCurrentPage(page);
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', page.toString());
+    setSearchParams(newParams);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const clearFilter = () => {
-    setFilterTag('');
     setSearchTag('');
-    setCurrentPage(1);
+    setSearchParams(new URLSearchParams());
   };
 
   return (

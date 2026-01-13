@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { Download, Lock, Tag, Calendar, Crown, ArrowLeft } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
+import { getResponsiveImageUrls, generateSrcSet, getPrimaryImageUrl } from '@/lib/imageUtils';
 
 export function VideoDetail() {
   const { id } = useParams<{ id: string }>();
@@ -15,6 +16,7 @@ export function VideoDetail() {
   const [downloadLinks, setDownloadLinks] = useState<DownloadLink[]>([]);
   const [loading, setLoading] = useState(true);
   const [linksLoading, setLinksLoading] = useState(false);
+  const [imageLoaded, setImageLoaded] = useState(false);
   const { isPremium, isAdmin, isAuthenticated } = useAuth();
   const { toast } = useToast();
 
@@ -91,11 +93,50 @@ export function VideoDetail() {
           <div className="lg:col-span-2 space-y-6">
             <Card>
               <div className="aspect-video relative overflow-hidden bg-muted rounded-t-xl">
-                <img
-                  src={video.thumbnail_url}
-                  alt={video.title}
-                  className="w-full h-full object-cover"
-                />
+                {/* Blur placeholder */}
+                {!imageLoaded && (
+                  <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-blue-900/40 animate-pulse" />
+                )}
+                
+                {/* Responsive thumbnail image */}
+                {(() => {
+                  const responsiveUrls = getResponsiveImageUrls(video.thumbnail_url);
+                  const primaryUrl = getPrimaryImageUrl(video.thumbnail_url);
+
+                  return responsiveUrls ? (
+                    <picture>
+                      <source
+                        type="image/avif"
+                        srcSet={generateSrcSet(responsiveUrls, 'avif')}
+                        sizes="(max-width: 1024px) 100vw, 66vw"
+                      />
+                      <source
+                        type="image/webp"
+                        srcSet={generateSrcSet(responsiveUrls, 'webp')}
+                        sizes="(max-width: 1024px) 100vw, 66vw"
+                      />
+                      <img
+                        src={primaryUrl}
+                        alt={video.title}
+                        className={`w-full h-full object-cover transition-opacity duration-500 ${
+                          imageLoaded ? 'opacity-100' : 'opacity-0'
+                        }`}
+                        onLoad={() => setImageLoaded(true)}
+                        onError={() => setImageLoaded(true)}
+                      />
+                    </picture>
+                  ) : (
+                    <img
+                      src={video.thumbnail_url}
+                      alt={video.title}
+                      className={`w-full h-full object-cover transition-opacity duration-500 ${
+                        imageLoaded ? 'opacity-100' : 'opacity-0'
+                      }`}
+                      onLoad={() => setImageLoaded(true)}
+                      onError={() => setImageLoaded(true)}
+                    />
+                  );
+                })()}
               </div>
               <CardHeader>
                 <CardTitle className="text-2xl md:text-3xl">{video.title}</CardTitle>

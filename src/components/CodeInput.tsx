@@ -91,7 +91,7 @@ export function CodeInput({ length = 6, onComplete, disabled = false }: CodeInpu
   };
 
   return (
-    <div className="flex gap-1 sm:gap-2 justify-center max-w-full">
+    <div className="flex flex-wrap gap-2 justify-center max-w-full">
       {Array.from({ length }, (_, index) => (
         <Input
           key={index}
@@ -105,7 +105,7 @@ export function CodeInput({ length = 6, onComplete, disabled = false }: CodeInpu
           onPaste={(e) => handlePasteEvent(e, index)}
           onFocus={() => handleFocus(index)}
           disabled={disabled}
-          className="w-8 sm:w-12 h-12 sm:h-14 text-center text-lg sm:text-2xl font-bold flex-shrink-0"
+          className="w-10 sm:w-12 h-12 sm:h-14 text-center text-xl sm:text-2xl font-bold flex-shrink-0"
           autoComplete="off"
           autoFocus={index === 0}
         />

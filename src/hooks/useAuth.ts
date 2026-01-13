@@ -64,9 +64,58 @@ export function useAuth() {
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/verify-email`,
-      },
+    });
+    return { data, error };
+  };
+
+  const verifyEmailCode = async (email: string, token: string) => {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'signup',
+    });
+    
+    if (data?.user) {
+      // Refresh user data after verification
+      await fetchUserData(data.user.id);
+    }
+    
+    return { data, error };
+  };
+
+  const resendVerificationCode = async (email: string) => {
+    const { data, error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+    });
+    return { data, error };
+  };
+
+  const requestPasswordReset = async (email: string) => {
+    const { data, error } = await supabase.auth.resetPasswordForEmail(email);
+    return { data, error };
+  };
+
+  const resetPasswordWithCode = async (email: string, token: string, newPassword: string) => {
+    const { data, error } = await supabase.auth.verifyOtp({
+      email,
+      token,
+      type: 'recovery',
+    });
+
+    if (error) return { data: null, error };
+
+    // After OTP verification, update the password
+    const { data: updateData, error: updateError } = await supabase.auth.updateUser({
+      password: newPassword,
+    });
+
+    return { data: updateData, error: updateError };
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    const { data, error } = await supabase.auth.updateUser({
+      password: newPassword,
     });
     return { data, error };
   };
@@ -91,6 +140,11 @@ export function useAuth() {
     signUp,
     signOut,
     refreshUser,
+    verifyEmailCode,
+    resendVerificationCode,
+    requestPasswordReset,
+    resetPasswordWithCode,
+    updatePassword,
     isAuthenticated: !!session,
     isPremium: user?.membership_status === 'premium',
     isAdmin: user?.is_admin || false,

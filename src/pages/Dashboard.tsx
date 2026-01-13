@@ -3,7 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CONTACT_INFO } from '@/lib/utils';
-import { User, Crown, Clock, XCircle } from 'lucide-react';
+import { User, Crown, Clock, XCircle, KeyRound } from 'lucide-react';
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -97,6 +97,36 @@ export function Dashboard() {
                 <span className="font-medium capitalize">{user.payment_method}</span>
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <KeyRound className="h-5 w-5" />
+              Security Settings
+            </CardTitle>
+            <CardDescription>
+              Manage your account security
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              <div>
+                <h4 className="text-sm font-medium mb-2">Password</h4>
+                <p className="text-sm text-muted-foreground mb-3">
+                  Change your password to keep your account secure
+                </p>
+                <Button 
+                  variant="outline" 
+                  onClick={() => navigate('/forgot-password')}
+                  className="w-full sm:w-auto"
+                >
+                  <KeyRound className="h-4 w-4 mr-2" />
+                  Change Password
+                </Button>
+              </div>
+            </div>
           </CardContent>
         </Card>
 

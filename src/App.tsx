@@ -8,6 +8,8 @@ import { VideoDetail } from './pages/VideoDetail';
 import { Login } from './pages/Login';
 import { Signup } from './pages/Signup';
 import { VerifyEmail } from './pages/VerifyEmail';
+import { ForgotPassword } from './pages/ForgotPassword';
+import { ResetPassword } from './pages/ResetPassword';
 import { PaymentSubmit } from './pages/PaymentSubmit';
 import { Dashboard } from './pages/Dashboard';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -31,6 +33,8 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<Signup />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
+          <Route path="/forgot-password" element={<ForgotPassword />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
           {/* Protected routes - require auth */}
           <Route

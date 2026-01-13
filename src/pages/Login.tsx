@@ -6,29 +6,44 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { LogIn } from 'lucide-react';
+import { LogIn, Loader2 } from 'lucide-react';
 
 export function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn } = useAuth();
+  const [showResend, setShowResend] = useState(false);
+  const [resending, setResending] = useState(false);
+  const { signIn, resendVerificationCode } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
+    setShowResend(false);
 
     try {
       const { error, data } = await signIn(email, password);
       
       if (error) {
-        toast({
-          title: 'Login failed',
-          description: error.message,
-          variant: 'destructive',
-        });
+        // Check if error is due to unverified email
+        if (error.message.toLowerCase().includes('email not confirmed') || 
+            error.message.toLowerCase().includes('email verification')) {
+          setShowResend(true);
+          toast({
+            title: 'Email not verified',
+            description: 'Please verify your email first. Click the button below to resend the verification code.',
+            variant: 'destructive',
+            duration: 8000,
+          });
+        } else {
+          toast({
+            title: 'Login failed',
+            description: error.message,
+            variant: 'destructive',
+          });
+        }
       } else if (data?.user) {
         // Check user's membership status and redirect accordingly
         const { data: userData } = await import('@/lib/supabase').then(m => 
@@ -55,6 +70,45 @@ export function Login() {
       });
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendCode = async () => {
+    if (!email) {
+      toast({
+        title: 'Email required',
+        description: 'Please enter your email address',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setResending(true);
+    try {
+      const { error } = await resendVerificationCode(email);
+
+      if (error) {
+        toast({
+          title: 'Resend failed',
+          description: error.message,
+          variant: 'destructive',
+        });
+      } else {
+        toast({
+          title: 'Code sent!',
+          description: 'A new verification code has been sent to your email.',
+        });
+        // Redirect to verification page
+        navigate('/verify-email', { state: { email } });
+      }
+    } catch (err) {
+      toast({
+        title: 'Error',
+        description: 'Failed to resend code',
+        variant: 'destructive',
+      });
+    } finally {
+      setResending(false);
     }
   };
 
@@ -86,7 +140,12 @@ export function Login() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link to="/forgot-password" className="text-xs text-primary hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -100,6 +159,27 @@ export function Login() {
               {loading ? 'Signing in...' : 'Sign In'}
             </Button>
           </form>
+
+          {showResend && (
+            <div className="mt-4">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={handleResendCode}
+                disabled={resending}
+              >
+                {resending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  'Resend Verification Code'
+                )}
+              </Button>
+            </div>
+          )}
+
           <div className="mt-4 text-center text-sm">
             Don't have an account?{' '}
             <Link to="/signup" className="text-primary hover:underline">

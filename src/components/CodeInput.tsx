@@ -1,4 +1,4 @@
-import { useRef, useState, KeyboardEvent, ClipboardEvent } from 'react';
+import { useRef, useState, type KeyboardEvent, type ClipboardEvent } from 'react';
 import { Input } from '@/components/ui/input';
 
 interface CodeInputProps {
@@ -95,7 +95,7 @@ export function CodeInput({ length = 6, onComplete, disabled = false }: CodeInpu
       {Array.from({ length }, (_, index) => (
         <Input
           key={index}
-          ref={(el) => (inputRefs.current[index] = el)}
+          ref={(el) => { inputRefs.current[index] = el; }}
           type="text"
           inputMode="numeric"
           maxLength={1}

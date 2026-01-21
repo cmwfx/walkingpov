@@ -22,7 +22,7 @@ export const CRYPTO_ADDRESSES = {
 	},
 };
 
-export const GIFT_CARD_LINK = "https://a.co/d/8yKXq4k";
+export const GIFT_CARD_LINK = "https://www.g2a.com/rewarble-visa-gift-card-30-usd-by-rewarble-key-global-i10000502992007?uuid=c658cf69-c2e7-4e95-b1f0-341128a2d59c";
 
 export const CONTACT_INFO = {
 	telegram: "@walkingpov",

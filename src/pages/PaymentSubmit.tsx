@@ -167,9 +167,9 @@ export function PaymentSubmit() {
             <CardHeader>
               <div className="flex items-center gap-2">
                 <CreditCard className="h-5 w-5" />
-                <CardTitle>Amazon Gift Card</CardTitle>
+                <CardTitle>REWARBLE VISA Gift Card</CardTitle>
               </div>
-              <CardDescription>Pay with an Amazon gift card</CardDescription>
+              <CardDescription>Pay with a REWARBLE VISA gift card</CardDescription>
             </CardHeader>
           </Card>
         </div>
@@ -208,9 +208,9 @@ export function PaymentSubmit() {
         ) : (
           <Card className="mb-8">
             <CardHeader>
-              <CardTitle>Amazon Gift Card Payment</CardTitle>
+              <CardTitle>REWARBLE VISA Gift Card Payment</CardTitle>
               <CardDescription>
-                Purchase a $30 Amazon gift card from the link below and submit the gift card code
+                Purchase a $30 REWARBLE VISA gift card from the link below and submit the gift card code
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -221,7 +221,7 @@ export function PaymentSubmit() {
                 className="flex items-center justify-center gap-2 p-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
               >
                 <CreditCard className="h-5 w-5" />
-                Purchase Amazon Gift Card
+                Purchase REWARBLE VISA Gift Card
                 <ExternalLink className="h-4 w-4" />
               </a>
             </CardContent>
@@ -234,7 +234,7 @@ export function PaymentSubmit() {
             <CardDescription>
               {paymentType === 'crypto' 
                 ? 'Enter your transaction ID or hash'
-                : 'Enter your Amazon gift card code'
+                : 'Enter your REWARBLE VISA gift card code'
               }
             </CardDescription>
           </CardHeader>
@@ -242,14 +242,14 @@ export function PaymentSubmit() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="proof">
-                  {paymentType === 'crypto' ? 'Transaction ID' : 'Amazon Gift Card Code'}
+                  {paymentType === 'crypto' ? 'Transaction ID' : 'REWARBLE VISA Gift Card Code'}
                 </Label>
                 <Input
                   id="proof"
                   placeholder={
                     paymentType === 'crypto' 
                       ? 'Enter transaction hash/ID'
-                      : 'Enter Amazon gift card code'
+                      : 'Enter REWARBLE VISA gift card code'
                   }
                   value={proof}
                   onChange={(e) => setProof(e.target.value)}

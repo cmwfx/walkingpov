@@ -169,7 +169,7 @@ export function PaymentSubmit() {
                 <CreditCard className="h-5 w-5" />
                 <CardTitle>REWARBLE VISA Gift Card</CardTitle>
               </div>
-              <CardDescription>Pay with a REWARBLE VISA gift card</CardDescription>
+              <CardDescription>Pay with Paypal, Visa, Mastercard etc</CardDescription>
             </CardHeader>
           </Card>
         </div>

@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { PremiumBenefits } from '@/components/PremiumBenefits';
+import { DiscountTimer } from '@/components/DiscountTimer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +10,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/components/ui/use-toast';
 import { supabase } from '@/lib/supabase';
 import { CRYPTO_ADDRESSES, GIFT_CARD_LINK, CONTACT_INFO } from '@/lib/utils';
-import { Copy, ExternalLink, Wallet, CreditCard, CheckCircle } from 'lucide-react';
+import { Copy, ExternalLink, Wallet, CreditCard, CheckCircle, Sparkles } from 'lucide-react';
 
 export function PaymentSubmit() {
   const [paymentType, setPaymentType] = useState<'crypto' | 'giftcard'>('crypto');
@@ -138,8 +140,23 @@ export function PaymentSubmit() {
     <div className="container mx-auto px-4 py-16">
       <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
+          <div className="inline-flex items-center justify-center p-3 rounded-xl bg-primary/10 mb-6 border border-primary/20 backdrop-blur-sm animate-pulse">
+            <div className="flex items-center gap-2 mr-3">
+              <Sparkles className="h-5 w-5 text-yellow-500" />
+              <span className="font-bold text-base bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">Celebrating 10k Members!</span>
+            </div>
+            <div className="flex items-center gap-2 border-l border-primary/20 pl-3">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Offer Ends In</span>
+              <DiscountTimer />
+            </div>
+          </div>
+          
           <h1 className="text-4xl font-bold mb-2">Lifetime Premium Access</h1>
-          <p className="text-xl text-muted-foreground">One-time payment of $30</p>
+          <p className="text-xl text-muted-foreground mb-8">One-time payment of $30</p>
+          
+          <div className="max-w-xl mx-auto text-left mb-12">
+            <PremiumBenefits className="bg-muted/30 p-6 rounded-xl border" />
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 gap-6 mb-8">

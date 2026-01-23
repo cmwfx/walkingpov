@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
 import { supabase, type PaymentRequest } from '@/lib/supabase';
+import { API_URL } from '@/lib/utils';
+import { getAuthHeaders } from '@/lib/api';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -95,6 +97,37 @@ export function ReviewPayments() {
         .eq('id', request.user_id);
 
       if (userError) throw userError;
+
+      // Send email notification
+      try {
+        const headers = await getAuthHeaders();
+        const response = await fetch(`${API_URL}/api/payments/notify-review`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            email: request.user_email,
+            status,
+            reason: notes[requestId],
+          }),
+        });
+        
+        if (!response.ok) {
+          console.error('Failed to send email notification');
+          toast({
+            title: 'Warning',
+            description: 'Payment updated but email notification failed to send',
+            variant: 'destructive',
+          });
+        }
+      } catch (emailError) {
+        console.error('Error sending email:', emailError);
+        // Don't throw here to avoid rolling back the UI state if email fails
+        toast({
+          title: 'Warning',
+          description: 'Payment updated but email notification failed to send',
+          variant: 'destructive',
+        });
+      }
 
       toast({
         title: status === 'approved' ? 'Payment Approved' : 'Payment Denied',

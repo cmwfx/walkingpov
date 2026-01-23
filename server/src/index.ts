@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import uploadRoutes from './routes/upload.js';
 import videoRoutes from './routes/videos.js';
 import bulkUploadRoutes from './routes/bulk-upload.js';
+import paymentRoutes from './routes/payments.js';
 
 dotenv.config();
 
@@ -53,6 +54,7 @@ app.use('/uploads', express.static(path.resolve(uploadDir), {
 app.use('/api/upload', uploadRoutes);
 app.use('/api/videos', videoRoutes);
 app.use('/api/bulk-upload', bulkUploadRoutes);
+app.use('/api/payments', paymentRoutes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

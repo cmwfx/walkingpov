@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { LogOut, User, Shield, Video, Crown, Sparkles, Menu, X } from 'lucide-react';
 import { useState } from 'react';
+import { ActiveUserCount } from './ActiveUserCount';
 
 export function Navbar() {
   const { user, isAuthenticated, isAdmin, signOut } = useAuth();
@@ -38,6 +39,8 @@ export function Navbar() {
               )}
             </div>
           </div>
+
+          <ActiveUserCount />
 
           <div className="flex items-center gap-3">
             {isAuthenticated ? (
@@ -113,6 +116,11 @@ export function Navbar() {
               </>
             )}
           </div>
+        </div>
+
+        {/* Mobile active user count */}
+        <div className="-mx-4 md:hidden">
+          <ActiveUserCount mobile />
         </div>
 
         {/* Mobile menu */}

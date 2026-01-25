@@ -44,7 +44,8 @@ async function downloadImage(imageUrl: string, uploadDir: string, baseUrl: strin
       throw new Error(`Failed to download image: ${response.statusText}`);
     }
 
-    const buffer = await response.buffer();
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
     
     // Generate unique filename
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -80,6 +81,7 @@ async function downloadImage(imageUrl: string, uploadDir: string, baseUrl: strin
     }
 
     // Return the medium WebP URL as the primary thumbnail
+    // Ensure we use the configured Frontend/API URL or construct one correctly
     return `${baseUrl}/uploads/${baseFilename}-medium.webp`;
   } catch (error) {
     console.error('Image download error:', error);
@@ -156,10 +158,21 @@ router.post('/json', verifyToken, requireAdmin, async (req: AuthRequest, res) =>
     }
 
     const uploadDir = process.env.UPLOAD_DIR || './uploads';
+    
     // Construct the base URL for uploaded files
-    const protocol = req.protocol;
-    const host = req.get('host');
-    const baseUrl = `${protocol}://${host}`;
+    // Prioritize configured API URL, then fallback to request host
+    let baseUrl = process.env.API_URL || process.env.FRONTEND_URL;
+    
+    if (!baseUrl) {
+      const protocol = req.protocol; // 'https' if trust proxy is on and behind Nginx
+      const host = req.get('host');
+      baseUrl = `${protocol}://${host}`;
+    }
+    
+    // Remove trailing slash if present
+    if (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.slice(0, -1);
+    }
     
     const results: BulkUploadResponse['results'] = {
       successful: 0,
@@ -167,23 +180,31 @@ router.post('/json', verifyToken, requireAdmin, async (req: AuthRequest, res) =>
       errors: []
     };
 
-    // Process each video entry
-    for (let i = 0; i < videos.length; i++) {
-      const entry = videos[i];
-      console.log(`Processing video ${i + 1}/${videos.length}: ${entry.title}`);
+    // Process videos in batches to avoid timeouts and memory issues
+    const BATCH_SIZE = 5;
+    for (let i = 0; i < videos.length; i += BATCH_SIZE) {
+      const batch = videos.slice(i, i + BATCH_SIZE);
+      const batchPromises = batch.map((entry, batchIndex) => {
+        const globalIndex = i + batchIndex;
+        console.log(`Processing video ${globalIndex + 1}/${videos.length}: ${entry.title}`);
+        return processVideoEntry(entry, req.user!.id, uploadDir, baseUrl!)
+          .then(result => ({ ...result, index: globalIndex, title: entry.title }));
+      });
 
-      const result = await processVideoEntry(entry, req.user!.id, uploadDir, baseUrl);
+      const batchResults = await Promise.all(batchPromises);
 
-      if (result.success) {
-        results.successful++;
-      } else {
-        results.failed++;
-        results.errors.push({
-          index: i,
-          title: entry.title || 'Unknown',
-          error: result.error || 'Unknown error'
-        });
-      }
+      batchResults.forEach(result => {
+        if (result.success) {
+          results.successful++;
+        } else {
+          results.failed++;
+          results.errors.push({
+            index: result.index,
+            title: result.title || 'Unknown',
+            error: result.error || 'Unknown error'
+          });
+        }
+      });
     }
 
     const response: BulkUploadResponse = {

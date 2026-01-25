@@ -35,6 +35,9 @@ app.use(compression({
   level: 6
 }));
 
+// Trust proxy (Nginx) for correct protocol/IP
+app.set('trust proxy', 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 

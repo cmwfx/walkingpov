@@ -29,7 +29,7 @@ CREATE POLICY "Admins can read all audit logs"
         EXISTS (
             SELECT 1 FROM users
             WHERE users.id = auth.uid()
-            AND users.role = 'admin'
+            AND users.is_admin = true
         )
     );
 

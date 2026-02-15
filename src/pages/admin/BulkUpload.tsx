@@ -1,31 +1,84 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { bulkUploadFromJson } from '@/lib/api';
-import { Upload, ArrowLeft, FileJson, CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { startBulkUpload, getBulkUploadStatus, type BulkUploadJobStatus } from '@/lib/api';
+import { Upload, ArrowLeft, FileJson, CheckCircle, XCircle, AlertCircle, Loader2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-
-interface UploadResult {
-  success: boolean;
-  results: {
-    successful: number;
-    failed: number;
-    errors: Array<{
-      index: number;
-      title: string;
-      error: string;
-    }>;
-  };
-}
+import { Progress } from '@/components/ui/progress';
 
 export function BulkUpload() {
   const [jsonFile, setJsonFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<UploadResult | null>(null);
+  const [jobStatus, setJobStatus] = useState<BulkUploadJobStatus | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const pollingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Cleanup polling interval on unmount
+  useEffect(() => {
+    return () => {
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current);
+      }
+    };
+  }, []);
+
+  const startPolling = (jobId: string) => {
+    // Clear any existing interval
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+    }
+
+    // Poll every 2 seconds
+    pollingIntervalRef.current = setInterval(async () => {
+      try {
+        const status = await getBulkUploadStatus(jobId);
+        setJobStatus(status);
+
+        // Stop polling when job is complete
+        if (status.status === 'completed' || status.status === 'failed') {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setIsProcessing(false);
+          setLoading(false);
+
+          if (status.status === 'completed') {
+            toast({
+              title: 'Upload Complete!',
+              description: `Successfully uploaded ${status.successful} out of ${status.totalVideos} video(s)`,
+            });
+          } else {
+            toast({
+              title: 'Upload Failed',
+              description: 'The bulk upload job encountered an error',
+              variant: 'destructive',
+            });
+          }
+        }
+      } catch (error: any) {
+        console.error('Failed to poll job status:', error);
+        // Continue polling even on error, unless it's a 404 (job not found)
+        if (error.message.includes('not found')) {
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current);
+            pollingIntervalRef.current = null;
+          }
+          setIsProcessing(false);
+          setLoading(false);
+          toast({
+            title: 'Job Not Found',
+            description: 'The upload job could not be found. It may have expired.',
+            variant: 'destructive',
+          });
+        }
+      }
+    }, 2000);
+  };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -39,7 +92,7 @@ export function BulkUpload() {
         return;
       }
       setJsonFile(file);
-      setUploadResult(null); // Clear previous results
+      setJobStatus(null); // Clear previous results
     }
   };
 
@@ -85,36 +138,39 @@ export function BulkUpload() {
         return;
       }
 
-      // Upload to backend
-      const result = await bulkUploadFromJson(videos);
-      setUploadResult(result);
+      // Start async upload job
+      const { jobId } = await startBulkUpload(videos);
+      setIsProcessing(true);
 
-      if (result.success) {
-        toast({
-          title: 'Success!',
-          description: `Successfully uploaded ${result.results.successful} video(s)`,
-        });
-      } else {
-        toast({
-          title: 'Partial Success',
-          description: `Uploaded ${result.results.successful} video(s), ${result.results.failed} failed`,
-          variant: 'destructive',
-        });
-      }
+      toast({
+        title: 'Upload Started',
+        description: `Processing ${videos.length} video(s) in the background...`,
+      });
+
+      // Start polling for status updates
+      startPolling(jobId);
     } catch (error: any) {
       toast({
         title: 'Upload Failed',
-        description: error.message || 'Failed to upload videos. Please try again.',
+        description: error.message || 'Failed to start upload. Please try again.',
         variant: 'destructive',
       });
-    } finally {
       setLoading(false);
     }
   };
 
   const handleReset = () => {
+    // Stop polling if active
+    if (pollingIntervalRef.current) {
+      clearInterval(pollingIntervalRef.current);
+      pollingIntervalRef.current = null;
+    }
+
     setJsonFile(null);
-    setUploadResult(null);
+    setJobStatus(null);
+    setIsProcessing(false);
+    setLoading(false);
+
     // Reset file input
     const fileInput = document.getElementById('json-file') as HTMLInputElement;
     if (fileInput) {
@@ -194,15 +250,15 @@ export function BulkUpload() {
 
             {/* Action Buttons */}
             <div className="flex gap-4">
-              <Button 
-                type="submit" 
-                className="flex-1" 
-                disabled={loading || !jsonFile}
+              <Button
+                type="submit"
+                className="flex-1"
+                disabled={loading || !jsonFile || isProcessing}
               >
-                {loading ? (
+                {loading || isProcessing ? (
                   <>
-                    <Upload className="h-4 w-4 mr-2 animate-pulse" />
-                    Processing...
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    {isProcessing ? 'Processing...' : 'Starting...'}
                   </>
                 ) : (
                   <>
@@ -215,19 +271,25 @@ export function BulkUpload() {
                 type="button"
                 variant="outline"
                 onClick={handleReset}
-                disabled={loading}
+                disabled={loading || isProcessing}
               >
                 Reset
               </Button>
             </div>
           </form>
 
-          {/* Upload Results */}
-          {uploadResult && (
+          {/* Progress Section */}
+          {isProcessing && jobStatus && (
             <div className="mt-8 space-y-4">
-              <h3 className="text-lg font-semibold">Upload Results</h3>
-              
-              {/* Summary */}
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Upload Progress</h3>
+                <span className="text-sm text-muted-foreground">
+                  {jobStatus.processed} / {jobStatus.totalVideos} videos
+                </span>
+              </div>
+
+              <Progress value={jobStatus.processed} max={jobStatus.totalVideos} />
+
               <div className="grid grid-cols-2 gap-4">
                 <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
                   <CardContent className="pt-6">
@@ -236,7 +298,7 @@ export function BulkUpload() {
                       <div>
                         <p className="text-sm text-muted-foreground">Successful</p>
                         <p className="text-2xl font-bold text-green-700 dark:text-green-300">
-                          {uploadResult.results.successful}
+                          {jobStatus.successful}
                         </p>
                       </div>
                     </div>
@@ -250,7 +312,67 @@ export function BulkUpload() {
                       <div>
                         <p className="text-sm text-muted-foreground">Failed</p>
                         <p className="text-2xl font-bold text-red-700 dark:text-red-300">
-                          {uploadResult.results.failed}
+                          {jobStatus.failed}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Live Error Stream */}
+              {jobStatus.errors.length > 0 && (
+                <div className="mt-4">
+                  <h4 className="text-sm font-semibold mb-2 text-red-600 dark:text-red-400">
+                    Errors ({jobStatus.errors.length})
+                  </h4>
+                  <div className="space-y-2 max-h-64 overflow-y-auto">
+                    {jobStatus.errors.map((error, idx) => (
+                      <Alert key={idx} variant="destructive">
+                        <XCircle className="h-4 w-4" />
+                        <AlertTitle>
+                          #{error.index + 1}: {error.title}
+                        </AlertTitle>
+                        <AlertDescription className="text-xs">
+                          {error.error}
+                        </AlertDescription>
+                      </Alert>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Completed Results */}
+          {!isProcessing && jobStatus && (jobStatus.status === 'completed' || jobStatus.status === 'failed') && (
+            <div className="mt-8 space-y-4">
+              <h3 className="text-lg font-semibold">Upload Complete</h3>
+
+              {/* Summary */}
+              <div className="grid grid-cols-2 gap-4">
+                <Card className="bg-green-50 dark:bg-green-950 border-green-200 dark:border-green-800">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5 text-green-600 dark:text-green-400" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Successful</p>
+                        <p className="text-2xl font-bold text-green-700 dark:text-green-300">
+                          {jobStatus.successful}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="bg-red-50 dark:bg-red-950 border-red-200 dark:border-red-800">
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-2">
+                      <XCircle className="h-5 w-5 text-red-600 dark:text-red-400" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Failed</p>
+                        <p className="text-2xl font-bold text-red-700 dark:text-red-300">
+                          {jobStatus.failed}
                         </p>
                       </div>
                     </div>
@@ -259,13 +381,13 @@ export function BulkUpload() {
               </div>
 
               {/* Error Details */}
-              {uploadResult.results.errors.length > 0 && (
+              {jobStatus.errors.length > 0 && (
                 <div className="mt-4">
                   <h4 className="text-sm font-semibold mb-2 text-red-600 dark:text-red-400">
-                    Failed Uploads ({uploadResult.results.errors.length})
+                    Failed Uploads ({jobStatus.errors.length})
                   </h4>
                   <div className="space-y-2 max-h-64 overflow-y-auto">
-                    {uploadResult.results.errors.map((error, idx) => (
+                    {jobStatus.errors.map((error, idx) => (
                       <Alert key={idx} variant="destructive">
                         <XCircle className="h-4 w-4" />
                         <AlertTitle>

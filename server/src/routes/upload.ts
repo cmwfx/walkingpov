@@ -5,6 +5,8 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { verifyToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
+import { uploadLimiter } from '../middleware/rateLimiter.js';
+import { fileTypeFromBuffer } from 'file-type';
 
 const router = Router();
 
@@ -46,10 +48,45 @@ const upload = multer({
 });
 
 // Upload thumbnail endpoint (admin only)
-router.post('/thumbnail', verifyToken, requireAdmin, upload.single('thumbnail'), async (req: AuthRequest, res) => {
+router.post('/thumbnail', uploadLimiter, verifyToken, requireAdmin, upload.single('thumbnail'), async (req: AuthRequest, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ error: 'No file uploaded' });
+    }
+
+    // Read file buffer for validation
+    const buffer = await fs.promises.readFile(req.file.path);
+
+    // Validate file type using magic bytes
+    const fileType = await fileTypeFromBuffer(buffer);
+    const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
+    if (!fileType || !allowedMimeTypes.includes(fileType.mime)) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({
+        error: 'Invalid file type. Only JPEG, PNG, GIF, and WebP images are allowed.',
+      });
+    }
+
+    // Prevent decompression bombs by checking image dimensions
+    const metadata = await sharp(buffer).metadata();
+    const maxPixels = 25000000; // 25 megapixels (e.g., 5000x5000)
+    const totalPixels = (metadata.width || 0) * (metadata.height || 0);
+
+    if (totalPixels > maxPixels) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({
+        error: 'Image too large. Maximum size is 25 megapixels.',
+      });
+    }
+
+    // Additional file size check (max 50MB)
+    const maxFileSize = 50 * 1024 * 1024; // 50MB in bytes
+    if (buffer.length > maxFileSize) {
+      fs.unlinkSync(req.file.path);
+      return res.status(400).json({
+        error: 'File size too large. Maximum size is 50MB.',
+      });
     }
 
     const uploadDir = process.env.UPLOAD_DIR || './uploads';

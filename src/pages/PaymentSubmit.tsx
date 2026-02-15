@@ -8,8 +8,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/lib/supabase';
-import { CRYPTO_ADDRESSES, GIFT_CARD_LINK, CONTACT_INFO } from '@/lib/utils';
+import { CRYPTO_ADDRESSES, GIFT_CARD_LINK, CONTACT_INFO, API_URL } from '@/lib/utils';
+import { getAuthHeaders } from '@/lib/api';
 import { Copy, ExternalLink, Wallet, CreditCard, CheckCircle, Sparkles } from 'lucide-react';
 
 export function PaymentSubmit() {
@@ -34,43 +34,24 @@ export function PaymentSubmit() {
     setLoading(true);
 
     try {
-      // Get the current authenticated user's ID
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-      
-      if (!authUser) {
-        throw new Error('Not authenticated');
-      }
-
-      const { error } = await supabase.from('payment_requests').insert({
-        user_id: authUser.id,
-        payment_type: paymentType,
-        proof: proof.trim(),
-        status: 'pending',
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/api/payments/submit`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({
+          payment_type: paymentType,
+          proof: proof.trim(),
+        }),
       });
 
-      if (error) {
-        console.error('Payment insert error:', error);
-        throw error;
-      }
-
-      // Update user's payment method
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          payment_method: paymentType,
-          payment_proof: proof.trim(),
-          membership_status: 'pending',
-        })
-        .eq('id', authUser.id);
-
-      if (updateError) {
-        console.error('User update error:', updateError);
-        throw updateError;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Failed to submit payment');
       }
 
       refreshUser();
       setSubmitted(true);
-      
+
       toast({
         title: 'Payment submitted!',
         description: 'Your payment is under review. We will contact you soon.',
@@ -264,14 +245,21 @@ export function PaymentSubmit() {
                 <Input
                   id="proof"
                   placeholder={
-                    paymentType === 'crypto' 
+                    paymentType === 'crypto'
                       ? 'Enter transaction hash/ID'
                       : 'Enter REWARBLE VISA gift card code'
                   }
                   value={proof}
                   onChange={(e) => setProof(e.target.value)}
+                  maxLength={500}
                   required
                 />
+                <div className="flex justify-between items-center text-xs text-muted-foreground">
+                  <span>Maximum 500 characters</span>
+                  <span className={proof.length > 450 ? 'text-yellow-600' : ''}>
+                    {proof.length}/500
+                  </span>
+                </div>
               </div>
               <Button type="submit" className="w-full" disabled={loading}>
                 {loading ? 'Submitting...' : 'Submit Payment'}

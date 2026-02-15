@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { CheckCircle, XCircle, Clock, ArrowLeft, User as UserIcon } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { formatDate } from '@/lib/utils';
+import DOMPurify from 'dompurify';
 
 interface PaymentRequestWithUser extends PaymentRequest {
   user_email?: string;
@@ -31,17 +32,21 @@ export function ReviewPayments() {
   const fetchPaymentRequests = async () => {
     setLoading(true);
     try {
-      const { data: requestsData, error: requestsError } = await supabase
-        .from('payment_requests')
-        .select('*')
-        .eq('status', 'pending')
-        .order('created_at', { ascending: true });
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_URL}/api/payments/requests`, {
+        method: 'GET',
+        headers,
+      });
 
-      if (requestsError) throw requestsError;
+      if (!response.ok) {
+        throw new Error('Failed to fetch payment requests');
+      }
+
+      const requestsData = await response.json();
 
       // Fetch user emails for each request
       const requestsWithUsers = await Promise.all(
-        (requestsData || []).map(async (request) => {
+        requestsData.map(async (request: PaymentRequest) => {
           const { data: userData } = await supabase
             .from('users')
             .select('email')
@@ -215,7 +220,9 @@ export function ReviewPayments() {
                       <Label className="text-muted-foreground">
                         {request.payment_type === 'crypto' ? 'Transaction ID' : 'Gift Card Code'}
                       </Label>
-                      <p className="font-mono text-sm break-all">{request.proof}</p>
+                      <p className="font-mono text-sm break-all">
+                        {DOMPurify.sanitize(request.proof, { ALLOWED_TAGS: [] })}
+                      </p>
                     </div>
                   </div>
 

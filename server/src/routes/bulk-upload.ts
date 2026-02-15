@@ -1,11 +1,13 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 import { verifyToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
+import { uploadLimiter } from '../middleware/rateLimiter.js';
 import fetch from 'node-fetch';
 import sharp from 'sharp';
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { bulkUploadQueue } from '../services/bulkUploadQueue.js';
 
 const router = Router();
 
@@ -147,7 +149,7 @@ async function processVideoEntry(
 }
 
 // Bulk upload from JSON
-router.post('/json', verifyToken, requireAdmin, async (req: AuthRequest, res) => {
+router.post('/json', uploadLimiter, verifyToken, requireAdmin, async (req: AuthRequest, res) => {
   try {
     const { videos } = req.body;
 
@@ -218,6 +220,100 @@ router.post('/json', verifyToken, requireAdmin, async (req: AuthRequest, res) =>
     res.status(500).json({ 
       error: 'Failed to process bulk upload',
       details: error.message 
+    });
+  }
+});
+
+// Async bulk upload - Start job and return immediately
+router.post('/json/start', uploadLimiter, verifyToken, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { videos } = req.body;
+
+    if (!videos || !Array.isArray(videos) || videos.length === 0) {
+      return res.status(400).json({
+        error: 'Invalid request. Expected an array of videos in the request body.'
+      });
+    }
+
+    const uploadDir = process.env.UPLOAD_DIR || './uploads';
+
+    // Construct the base URL for uploaded files
+    let baseUrl = process.env.API_URL || process.env.FRONTEND_URL;
+
+    if (!baseUrl) {
+      const protocol = req.protocol;
+      const host = req.get('host');
+      baseUrl = `${protocol}://${host}`;
+    }
+
+    // Remove trailing slash if present
+    if (baseUrl.endsWith('/')) {
+      baseUrl = baseUrl.slice(0, -1);
+    }
+
+    // Create job and start processing in background
+    const jobId = bulkUploadQueue.createJob(
+      videos,
+      req.user!.id,
+      uploadDir,
+      baseUrl
+    );
+
+    console.log(`Created bulk upload job ${jobId} with ${videos.length} videos`);
+
+    res.json({ jobId });
+  } catch (error: any) {
+    console.error('Failed to create bulk upload job:', error);
+
+    // Handle specific error cases
+    if (error.message.includes('Too many concurrent uploads')) {
+      return res.status(429).json({
+        error: error.message
+      });
+    }
+
+    res.status(500).json({
+      error: 'Failed to start bulk upload',
+      details: error.message
+    });
+  }
+});
+
+// Get job status
+router.get('/json/status/:jobId', verifyToken, requireAdmin, async (req: AuthRequest, res) => {
+  try {
+    const { jobId } = req.params;
+    const job = bulkUploadQueue.getJob(jobId);
+
+    if (!job) {
+      return res.status(404).json({
+        error: 'Job not found. It may have expired or never existed.'
+      });
+    }
+
+    // Only allow users to view their own jobs
+    if (job.userId !== req.user!.id) {
+      return res.status(403).json({
+        error: 'Access denied'
+      });
+    }
+
+    res.json({
+      id: job.id,
+      totalVideos: job.totalVideos,
+      processed: job.processed,
+      successful: job.successful,
+      failed: job.failed,
+      status: job.status,
+      errors: job.errors,
+      startedAt: job.startedAt,
+      completedAt: job.completedAt,
+    });
+  } catch (error: any) {
+    console.error('Failed to get job status:', error);
+    res.status(500).json({
+      error: 'Failed to get job status',
+      details: error.message
     });
   }
 });

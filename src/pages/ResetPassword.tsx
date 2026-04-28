@@ -78,7 +78,7 @@ export function ResetPassword() {
     if (!code) {
       toast({
         title: 'Code required',
-        description: 'Please enter the 8-digit code from your email',
+        description: 'Please enter the 6-digit code from your email',
         variant: 'destructive',
       });
       return;
@@ -179,7 +179,7 @@ export function ResetPassword() {
           </div>
           <CardTitle className="text-2xl text-center">Reset Password</CardTitle>
           <CardDescription className="text-center">
-            We sent an 8-digit code to <strong>{email}</strong>
+            We sent a 6-digit code to <strong>{email}</strong>
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -191,7 +191,7 @@ export function ResetPassword() {
                   Can't find the email? Check your spam or junk folder
                 </p>
                 <CodeInput 
-                  length={8}
+                  length={6}
                   onComplete={handleCodeComplete} 
                   disabled={loading}
                 />

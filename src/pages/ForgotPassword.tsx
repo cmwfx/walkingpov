@@ -31,7 +31,7 @@ export function ForgotPassword() {
       } else {
         toast({
           title: 'Check your email!',
-          description: 'We sent you an 8-digit password reset code.',
+          description: 'We sent you a 6-digit password reset code.',
         });
         // Redirect to reset password page with email
         navigate('/reset-password', { state: { email } });

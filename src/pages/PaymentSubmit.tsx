@@ -13,7 +13,7 @@ import { getAuthHeaders } from '@/lib/api';
 import { Copy, ExternalLink, Wallet, CreditCard, CheckCircle, Sparkles } from 'lucide-react';
 
 export function PaymentSubmit() {
-  const [paymentType, setPaymentType] = useState<'crypto' | 'giftcard'>('crypto');
+  const [paymentType, setPaymentType] = useState<'crypto' | 'giftcard'>('giftcard');
   const [proof, setProof] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -143,21 +143,6 @@ export function PaymentSubmit() {
         <div className="grid md:grid-cols-2 gap-6 mb-8">
           <Card 
             className={`cursor-pointer transition-all ${
-              paymentType === 'crypto' ? 'ring-2 ring-primary' : ''
-            }`}
-            onClick={() => setPaymentType('crypto')}
-          >
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Wallet className="h-5 w-5" />
-                <CardTitle>Cryptocurrency</CardTitle>
-              </div>
-              <CardDescription>Pay with BTC, LTC, or USDT</CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-all ${
               paymentType === 'giftcard' ? 'ring-2 ring-primary' : ''
             }`}
             onClick={() => setPaymentType('giftcard')}
@@ -170,9 +155,45 @@ export function PaymentSubmit() {
               <CardDescription>Pay with Paypal, Visa, Mastercard etc</CardDescription>
             </CardHeader>
           </Card>
+
+          <Card 
+            className={`cursor-pointer transition-all ${
+              paymentType === 'crypto' ? 'ring-2 ring-primary' : ''
+            }`}
+            onClick={() => setPaymentType('crypto')}
+          >
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <Wallet className="h-5 w-5" />
+                <CardTitle>Cryptocurrency</CardTitle>
+              </div>
+              <CardDescription>Pay with BTC, LTC, or USDT</CardDescription>
+            </CardHeader>
+          </Card>
         </div>
 
-        {paymentType === 'crypto' ? (
+        {paymentType === 'giftcard' ? (
+          <Card className="mb-8">
+            <CardHeader>
+              <CardTitle>REWARBLE VISA Gift Card Payment</CardTitle>
+              <CardDescription>
+                Purchase a $30 REWARBLE VISA gift card from the link below and submit the gift card code
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <a
+                href={GIFT_CARD_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-center gap-2 p-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
+              >
+                <CreditCard className="h-5 w-5" />
+                Purchase REWARBLE VISA Gift Card
+                <ExternalLink className="h-4 w-4" />
+              </a>
+            </CardContent>
+          </Card>
+        ) : (
           <Card className="mb-8">
             <CardHeader>
               <CardTitle>Cryptocurrency Addresses</CardTitle>
@@ -203,36 +224,15 @@ export function PaymentSubmit() {
               ))}
             </CardContent>
           </Card>
-        ) : (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>REWARBLE VISA Gift Card Payment</CardTitle>
-              <CardDescription>
-                Purchase a $30 REWARBLE VISA gift card from the link below and submit the gift card code
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <a
-                href={GIFT_CARD_LINK}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 p-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                <CreditCard className="h-5 w-5" />
-                Purchase REWARBLE VISA Gift Card
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            </CardContent>
-          </Card>
         )}
 
         <Card>
           <CardHeader>
             <CardTitle>Submit Payment Proof</CardTitle>
             <CardDescription>
-              {paymentType === 'crypto' 
-                ? 'Enter your transaction ID or hash'
-                : 'Enter your REWARBLE VISA gift card code'
+              {paymentType === 'giftcard'
+                ? 'Enter your REWARBLE VISA gift card code'
+                : 'Enter your transaction ID or hash'
               }
             </CardDescription>
           </CardHeader>
@@ -240,14 +240,14 @@ export function PaymentSubmit() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="proof">
-                  {paymentType === 'crypto' ? 'Transaction ID' : 'REWARBLE VISA Gift Card Code'}
+                  {paymentType === 'giftcard' ? 'REWARBLE VISA Gift Card Code' : 'Transaction ID'}
                 </Label>
                 <Input
                   id="proof"
                   placeholder={
-                    paymentType === 'crypto'
-                      ? 'Enter transaction hash/ID'
-                      : 'Enter REWARBLE VISA gift card code'
+                    paymentType === 'giftcard'
+                      ? 'Enter REWARBLE VISA gift card code'
+                      : 'Enter transaction hash/ID'
                   }
                   value={proof}
                   onChange={(e) => setProof(e.target.value)}

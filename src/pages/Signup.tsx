@@ -52,7 +52,7 @@ export function Signup() {
       } else {
         toast({
           title: 'Check your email!',
-          description: 'We sent you an 8-digit verification code.',
+          description: 'We sent you a 6-digit verification code.',
           duration: 5000,
         });
         // Redirect to verification page with email

@@ -141,7 +141,7 @@ export function VerifyEmail() {
           </div>
           <CardTitle className="text-2xl text-center">Verify Your Email</CardTitle>
           <CardDescription className="text-center">
-            We sent an 8-digit code to <strong>{email}</strong>
+            We sent a 6-digit code to <strong>{email}</strong>
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -156,7 +156,7 @@ export function VerifyEmail() {
             </div>
             
             <CodeInput 
-              length={8}
+              length={6}
               onComplete={handleCodeComplete} 
               disabled={verifying}
             />

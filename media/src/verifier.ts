@@ -1,11 +1,13 @@
 import crypto from 'node:crypto';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
-import { stat } from 'node:fs/promises';
+import { rename, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
 const port = Number(process.env.PORT || 3100);
 const mediaRoot = path.resolve(process.env.MEDIA_ROOT || '/srv/candidfan/media');
 const signingSecret = process.env.MEDIA_SIGNING_SECRET || '';
+const thumbnailRoot = path.resolve(process.env.THUMBNAIL_ROOT || '/srv/candidfan/thumbnails');
+const maxThumbnailBytes = 12 * 1024 * 1024;
 const MAX_MEDIA_LINK_VALIDITY_SECONDS = 60 * 60;
 const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -28,14 +30,57 @@ function send(res: ServerResponse, status: number, body = '') {
   res.end(body);
 }
 
+async function readBody(req: IncomingMessage) {
+  const chunks: Buffer[] = [];
+  let total = 0;
+  for await (const chunk of req) {
+    const piece = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+    total += piece.length;
+    if (total > maxThumbnailBytes) throw new Error('body_too_large');
+    chunks.push(piece);
+  }
+  return Buffer.concat(chunks);
+}
+
 async function handle(req: IncomingMessage, res: ServerResponse) {
-  if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405);
   let requestUrl: URL;
   try {
     requestUrl = new URL(req.url || '/', 'http://127.0.0.1');
   } catch {
     return send(res, 400);
   }
+  const uploadMatch = requestUrl.pathname.match(/^\/upload-thumbnail\/([^/]+)$/);
+  if (uploadMatch) {
+    if (req.method !== 'PUT') return send(res, 405);
+    const key = decodeURIComponent(uploadMatch[1]);
+    const expires = requestUrl.searchParams.get('expires') || '';
+    const signature = requestUrl.searchParams.get('sig') || '';
+    if (!verifyRequest(key, expires, signature)) return send(res, 403);
+    const contentType = String(req.headers['content-type'] || '').split(';', 1)[0].toLowerCase();
+    if (contentType !== 'image/jpeg') return send(res, 415);
+    const contentLength = Number(req.headers['content-length'] || 0);
+    if (!Number.isSafeInteger(contentLength) || contentLength <= 0 || contentLength > maxThumbnailBytes) return send(res, 413);
+
+    let body: Buffer;
+    try {
+      body = await readBody(req);
+    } catch (error) {
+      return send(res, error instanceof Error && error.message === 'body_too_large' ? 413 : 400);
+    }
+    if (body.length !== contentLength) return send(res, 400);
+
+    const thumbnailPath = path.join(thumbnailRoot, `${key}.jpg`);
+    const temporaryPath = path.join(thumbnailRoot, `.${key}.${process.pid}.part`);
+    try {
+      await writeFile(temporaryPath, body, { flag: 'wx', mode: 0o640 });
+      await rename(temporaryPath, thumbnailPath);
+      return send(res, 201);
+    } catch {
+      return send(res, 500);
+    }
+  }
+
+  if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405);
   const match = requestUrl.pathname.match(/^\/verify\/([^/]+)$/);
   if (!match) return send(res, 404);
   let key: string;

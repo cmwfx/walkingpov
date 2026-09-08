@@ -2,13 +2,13 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import type { Video } from '@/lib/supabase';
-import { getDownloadUrl, getVideo } from '@/lib/api';
+import { getDownloadUrl, getVideo, updateVideoThumbnail } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { PremiumBenefits } from '@/components/PremiumBenefits';
 import { DiscountTimer } from '@/components/DiscountTimer';
-import { Download, Lock, Tag, Calendar, Crown, ArrowLeft, Sparkles } from 'lucide-react';
+import { Download, Lock, Tag, Calendar, Crown, ArrowLeft, Sparkles, ImagePlus } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 import { getResponsiveImageUrls, generateSrcSet, getPrimaryImageUrl } from '@/lib/imageUtils';
 
@@ -25,6 +25,8 @@ export function VideoDetail() {
   const [loading, setLoading] = useState(true);
   const [linksLoading, setLinksLoading] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
+  const [thumbnailUploading, setThumbnailUploading] = useState(false);
   const { isPremium, isAdmin, isAuthenticated } = useAuth();
   const { toast } = useToast();
 
@@ -66,6 +68,25 @@ export function VideoDetail() {
       console.error('Error fetching download links:', error);
     } finally {
       setLinksLoading(false);
+    }
+  };
+
+  const handleThumbnailUpload = async () => {
+    if (!id || !thumbnailFile) return;
+    setThumbnailUploading(true);
+    try {
+      const result = await updateVideoThumbnail(id, thumbnailFile);
+      setVideo((current) => current ? { ...current, thumbnail_url: result.thumbnail_url } : current);
+      setThumbnailFile(null);
+      toast({ title: 'Thumbnail updated', description: 'The new thumbnail is now live.' });
+    } catch (error) {
+      toast({
+        title: 'Thumbnail update failed',
+        description: error instanceof Error ? error.message : 'Unable to update the thumbnail.',
+        variant: 'destructive',
+      });
+    } finally {
+      setThumbnailUploading(false);
     }
   };
 
@@ -176,6 +197,30 @@ export function VideoDetail() {
                 )}
               </CardContent>
             </Card>
+
+            {isAdmin && (
+              <Card className="border-amber-400/20 bg-amber-400/5">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <ImagePlus className="h-5 w-5 text-amber-300" />
+                    Edit thumbnail
+                  </CardTitle>
+                  <p className="text-sm text-muted-foreground">Upload a JPG, PNG, or WebP image to replace the current thumbnail.</p>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    onChange={(event) => setThumbnailFile(event.target.files?.[0] || null)}
+                    className="block w-full text-sm text-muted-foreground file:mr-4 file:rounded-md file:border-0 file:bg-primary file:px-3 file:py-2 file:text-sm file:font-medium file:text-primary-foreground hover:file:bg-primary/90"
+                  />
+                  <Button type="button" disabled={!thumbnailFile || thumbnailUploading} onClick={() => void handleThumbnailUpload()}>
+                    <ImagePlus className="mr-2 h-4 w-4" />
+                    {thumbnailUploading ? 'Uploading...' : 'Upload thumbnail'}
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Download Links Sidebar */}

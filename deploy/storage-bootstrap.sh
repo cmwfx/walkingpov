@@ -25,9 +25,11 @@ fi
 
 id -u candidfan-media >/dev/null 2>&1 || useradd --system --home-dir /opt/candidfan-media --shell /usr/sbin/nologin candidfan-media
 usermod --append --groups www-data candidfan-media
+usermod --append --groups candidfan-media www-data
 install -d -m 0755 /opt/candidfan-media /opt/candidfan-importer
 install -d -m 0755 /srv/candidfan
-install -d -m 0750 -o root -g www-data /srv/candidfan/media /srv/candidfan/thumbnails
+install -d -m 0750 -o root -g www-data /srv/candidfan/media
+install -d -m 0770 -o root -g candidfan-media /srv/candidfan/thumbnails
 install -d -m 0750 -o root -g root /srv/candidfan/intake
 install -d -m 0750 -o root -g candidfan-media /srv/candidfan/state
 install -m 0644 "${repo_dir}/media/placeholder.jpg" /srv/candidfan/thumbnails/placeholder.jpg

@@ -34,6 +34,20 @@ export const getMe = () => request<{ user: import('./supabase').User }>('/api/me
 export const getVideos = (page = 1, tag = '') => request<{ videos: import('./supabase').Video[]; pagination: { page: number; total: number; totalPages: number } }>(`/api/videos?page=${page}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`);
 export const getVideo = (id: string) => request<import('./supabase').Video>(`/api/videos/${encodeURIComponent(id)}`);
 export const getDownloadUrl = (id: string) => request<{ url: string; expires_at: string }>(`/api/videos/${encodeURIComponent(id)}/download`, {}, true);
+export async function updateVideoThumbnail(id: string, file: File) {
+  const form = new FormData();
+  form.append('thumbnail', file, 'thumbnail');
+  const headers = { ...(await authHeaders(false)), 'X-CSRF-Token': await getCsrfToken() };
+  const response = await fetch(`${API_URL}/api/admin/videos/${encodeURIComponent(id)}/thumbnail`, {
+    method: 'POST',
+    headers,
+    body: form,
+    credentials: 'include',
+  });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'Unable to update the video thumbnail.');
+  return body as { thumbnail_url: string };
+}
 export const submitPayment = (proof: string) => request('/api/payments/submit', { method: 'POST', body: JSON.stringify({ proof }) }, true);
 export const getPaymentRequests = () => request<import('./supabase').PaymentRequest[]>('/api/payments/requests', {}, true);
 export const reviewPayment = (id: string, decision: 'approved' | 'denied', notes: string) => request(`/api/payments/${id}/review`, { method: 'POST', body: JSON.stringify({ decision, notes }) }, true);

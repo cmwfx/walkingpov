@@ -4,13 +4,18 @@ import { verifyToken, requireAdmin, type AuthRequest } from '../middleware/auth.
 import { requireWorker } from '../middleware/worker.js';
 
 const router = Router();
+const PROCESSING_POOLS = new Set(['local', 'remote']);
+
+function parsePool(value: unknown) {
+  return typeof value === 'string' && PROCESSING_POOLS.has(value) ? value : null;
+}
 
 async function refresh(jobId: string) {
   await supabaseAdmin.rpc('refresh_import_job_stats', { p_job_id: jobId });
 }
 
 router.get('/admin/jobs', verifyToken, requireAdmin, async (_req: AuthRequest, res) => {
-  const { data, error } = await supabaseAdmin.from('import_jobs').select('id,status,worker_id,pause_requested,discovered_count,queued_count,processing_count,published_count,duplicate_count,failed_count,skipped_count,last_error,created_at,started_at,completed_at,updated_at').order('created_at', { ascending: false }).limit(50);
+  const { data, error } = await supabaseAdmin.from('import_jobs').select('id,status,processing_pool,worker_id,pause_requested,discovered_count,queued_count,processing_count,published_count,duplicate_count,failed_count,skipped_count,last_error,created_at,started_at,completed_at,updated_at').order('created_at', { ascending: false }).limit(50);
   if (error) return res.status(500).json({ error: 'Unable to load import jobs' });
   res.json(data || []);
 });
@@ -46,10 +51,38 @@ router.post('/admin/jobs/:id/retry', verifyToken, requireAdmin, async (req: Auth
   res.json({ success: true });
 });
 
-router.get('/worker/scan', requireWorker, async (_req, res) => {
-  const { data: current } = await supabaseAdmin.from('import_jobs').select('id,status').in('status', ['queued', 'scanning', 'processing']).order('created_at', { ascending: false }).limit(1).maybeSingle();
+router.post('/admin/jobs/:id/offload', verifyToken, requireAdmin, async (req: AuthRequest, res) => {
+  const { data: job, error: jobError } = await supabaseAdmin.from('import_jobs').select('id,status,processing_pool').eq('id', req.params.id).maybeSingle();
+  if (jobError) return res.status(500).json({ error: 'Unable to load import job' });
+  if (!job) return res.status(404).json({ error: 'Import job not found' });
+  if (job.processing_pool === 'remote') return res.json({ ...job, processing_pool: 'remote' });
+  if (!['queued', 'scanning', 'processing', 'paused'].includes(job.status)) return res.status(409).json({ error: 'Only an active import job can be offloaded' });
+  const { count, error: countError } = await supabaseAdmin.from('import_items').select('id', { count: 'exact', head: true }).eq('job_id', req.params.id).eq('status', 'processing');
+  if (countError) return res.status(500).json({ error: 'Unable to check active import leases' });
+  if ((count || 0) > 0) return res.status(409).json({ error: 'Pause the storage worker and wait for active files to finish before offloading', active_count: count });
+  const { data, error } = await supabaseAdmin.from('import_jobs').update({ processing_pool: 'remote', pause_requested: false, status: 'queued', worker_id: null, lease_until: null, heartbeat_at: null }).eq('id', req.params.id).select('id,status,processing_pool,pause_requested,queued_count,published_count,failed_count').single();
+  if (error) return res.status(500).json({ error: 'Unable to assign import job to remote processing' });
+  res.json(data);
+});
+
+router.post('/admin/jobs/:id/local', verifyToken, requireAdmin, async (req: AuthRequest, res) => {
+  const { data: job, error: jobError } = await supabaseAdmin.from('import_jobs').select('id,status,processing_pool').eq('id', req.params.id).maybeSingle();
+  if (jobError) return res.status(500).json({ error: 'Unable to load import job' });
+  if (!job) return res.status(404).json({ error: 'Import job not found' });
+  const { count, error: countError } = await supabaseAdmin.from('import_items').select('id', { count: 'exact', head: true }).eq('job_id', req.params.id).eq('status', 'processing');
+  if (countError) return res.status(500).json({ error: 'Unable to check active import leases' });
+  if ((count || 0) > 0) return res.status(409).json({ error: 'Wait for active remote files to finish before returning the job to local processing', active_count: count });
+  const { data, error } = await supabaseAdmin.from('import_jobs').update({ processing_pool: 'local', pause_requested: false, status: 'queued', worker_id: null, lease_until: null, heartbeat_at: null }).eq('id', req.params.id).select('id,status,processing_pool,pause_requested,queued_count,published_count,failed_count').single();
+  if (error) return res.status(500).json({ error: 'Unable to return import job to local processing' });
+  res.json(data);
+});
+
+router.get('/worker/scan', requireWorker, async (req, res) => {
+  const pool = parsePool(req.query.pool) || 'local';
+  const { data: current } = await supabaseAdmin.from('import_jobs').select('id,status,processing_pool').eq('processing_pool', pool).in('status', ['queued', 'scanning', 'processing']).order('created_at', { ascending: false }).limit(1).maybeSingle();
   if (current) return res.json(current);
-  const { data, error } = await supabaseAdmin.from('import_jobs').insert({ status: 'scanning' }).select('id,status').single();
+  if (pool === 'remote') return res.json({ id: null, status: 'idle', processing_pool: 'remote' });
+  const { data, error } = await supabaseAdmin.from('import_jobs').insert({ status: 'scanning', processing_pool: 'local' }).select('id,status,processing_pool').single();
   if (error) return res.status(500).json({ error: 'Unable to create scan job' });
   res.status(201).json(data);
 });
@@ -74,7 +107,8 @@ router.post('/worker/jobs/:id/inventory', requireWorker, async (req, res) => {
 router.post('/worker/items/claim', requireWorker, async (req, res) => {
   const workerId = typeof req.body?.worker_id === 'string' ? req.body.worker_id.slice(0, 100) : '';
   if (!workerId) return res.status(400).json({ error: 'worker_id is required' });
-  const { data, error } = await supabaseAdmin.rpc('claim_import_item', { p_worker_id: workerId, p_lease_seconds: 900 });
+  const pool = parsePool(req.body?.pool) || 'local';
+  const { data, error } = await supabaseAdmin.rpc('claim_import_item', { p_worker_id: workerId, p_lease_seconds: 900, p_pool: pool });
   if (error) return res.status(500).json({ error: 'Unable to claim import item' });
   res.json({ item: data || null });
 });
@@ -123,4 +157,3 @@ router.post('/worker/items/:id/fail', requireWorker, async (req, res) => {
 });
 
 export default router;
-

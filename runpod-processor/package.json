@@ -1,0 +1,12 @@
+{
+  "name": "candidfan-runpod-processor",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "start": "node processor.mjs"
+  },
+  "dependencies": {
+    "ssh2-sftp-client": "12.1.1"
+  }
+}

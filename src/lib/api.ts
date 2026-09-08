@@ -41,6 +41,8 @@ export async function getImportJobs() { return request<any[]>('/api/imports/admi
 export async function startImportJob() { return request<any>('/api/imports/admin/jobs', { method: 'POST', body: '{}' }, true); }
 export async function updateImportJob(id: string, pause: boolean) { return request<any>('/api/imports/admin/jobs/' + id, { method: 'PATCH', body: JSON.stringify({ pause }) }, true); }
 export async function retryImportJob(id: string) { return request<any>('/api/imports/admin/jobs/' + id + '/retry', { method: 'POST', body: '{}' }, true); }
+export async function offloadImportJob(id: string) { return request<any>('/api/imports/admin/jobs/' + id + '/offload', { method: 'POST', body: '{}' }, true); }
+export async function returnImportJobToLocal(id: string) { return request<any>('/api/imports/admin/jobs/' + id + '/local', { method: 'POST', body: '{}' }, true); }
 export async function getTickets(admin = false) { return request<SupportTicket[]>('/api/support/' + (admin ? 'admin/' : '') + 'tickets', {}, true); }
 export async function createTicket(subject: string, body: string) { return request<any>('/api/support/tickets', { method: 'POST', body: JSON.stringify({ subject, body }) }, true); }
 export async function getTicket(id: string) { return request<SupportTicket & { messages: SupportMessage[] }>('/api/support/tickets/' + id, {}, true); }
@@ -55,4 +57,3 @@ export async function createVideo() { throw new Error('Manual video creation was
 export async function startBulkUpload() { throw new Error('JSON catalog imports are disabled for the fresh CandidFan catalog'); }
 export async function getBulkUploadStatus() { throw new Error('JSON catalog imports are disabled for the fresh CandidFan catalog'); }
 export type BulkUploadJobStatus = never;
-

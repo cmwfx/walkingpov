@@ -7,6 +7,7 @@ create type public.video_status as enum ('draft', 'processing', 'published', 'fa
 create type public.payment_status as enum ('pending', 'approved', 'denied');
 create type public.import_job_status as enum ('queued', 'scanning', 'processing', 'paused', 'completed', 'failed');
 create type public.import_item_status as enum ('discovered', 'queued', 'processing', 'published', 'duplicate', 'failed', 'skipped');
+create type public.import_processing_pool as enum ('local', 'remote');
 create type public.ticket_status as enum ('open', 'closed');
 create type public.outbox_status as enum ('pending', 'sending', 'sent', 'failed');
 
@@ -66,6 +67,7 @@ create table public.video_assets (
 create table public.import_jobs (
   id uuid primary key default gen_random_uuid(),
   status public.import_job_status not null default 'queued',
+  processing_pool public.import_processing_pool not null default 'local',
   requested_by uuid references public.users(id) on delete set null,
   worker_id text,
   lease_until timestamptz,
@@ -173,6 +175,7 @@ create index videos_tags_idx on public.videos using gin (tags);
 create index videos_source_hash_idx on public.videos (source_sha256) where source_sha256 is not null;
 create index video_assets_sha_idx on public.video_assets (source_sha256);
 create index import_jobs_claim_idx on public.import_jobs (status, created_at) where status in ('queued', 'scanning', 'processing');
+create index import_jobs_pool_claim_idx on public.import_jobs (processing_pool, status, created_at) where status in ('queued', 'scanning', 'processing');
 create index import_items_claim_idx on public.import_items (status, lease_until, discovered_at) where status in ('discovered', 'queued', 'processing');
 create index import_items_job_idx on public.import_items (job_id, status);
 create index payment_requests_user_idx on public.payment_requests (user_id, created_at desc);
@@ -389,7 +392,11 @@ begin
 end;
 $$;
 
-create or replace function public.claim_import_item(p_worker_id text, p_lease_seconds integer default 900)
+create or replace function public.claim_import_item(
+  p_worker_id text,
+  p_lease_seconds integer default 900,
+  p_pool public.import_processing_pool default 'local'
+)
 returns jsonb
 language plpgsql
 security definer
@@ -402,6 +409,7 @@ begin
   from public.import_items i
   join public.import_jobs j on j.id = i.job_id
   where j.status in ('queued', 'scanning', 'processing')
+    and j.processing_pool = p_pool
     and not j.pause_requested
     and i.attempts < i.max_attempts
     and (i.status in ('discovered', 'queued') or (i.status = 'processing' and i.lease_until < now()))
@@ -492,13 +500,13 @@ $$;
 revoke execute on function public.submit_payment_request(uuid, text, integer, text) from public, anon, authenticated;
 revoke execute on function public.review_payment(uuid, uuid, public.payment_status, text) from public, anon, authenticated;
 revoke execute on function public.create_support_message(uuid, uuid, text, boolean) from public, anon, authenticated;
-revoke execute on function public.claim_import_item(text, integer) from public, anon, authenticated;
+revoke execute on function public.claim_import_item(text, integer, public.import_processing_pool) from public, anon, authenticated;
 revoke execute on function public.publish_import_item(uuid, text, text, text, text, text, bigint, text, numeric, text, text, text, jsonb, numeric, integer, integer, bigint, bigint, text, jsonb) from public, anon, authenticated;
 revoke execute on function public.refresh_import_job_stats(uuid) from public, anon, authenticated;
 grant execute on function public.submit_payment_request(uuid, text, integer, text) to service_role;
 grant execute on function public.review_payment(uuid, uuid, public.payment_status, text) to service_role;
 grant execute on function public.create_support_message(uuid, uuid, text, boolean) to service_role;
-grant execute on function public.claim_import_item(text, integer) to service_role;
+grant execute on function public.claim_import_item(text, integer, public.import_processing_pool) to service_role;
 grant execute on function public.publish_import_item(uuid, text, text, text, text, text, bigint, text, numeric, text, text, text, jsonb, numeric, integer, integer, bigint, bigint, text, jsonb) to service_role;
 grant execute on function public.refresh_import_job_stats(uuid) to service_role;
 

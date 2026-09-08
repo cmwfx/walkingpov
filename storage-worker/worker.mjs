@@ -9,6 +9,7 @@ import os from 'node:os';
 const API_URL = (process.env.WEB_API_URL || 'https://candidfan.com/api').replace(/\/$/, '');
 const WORKER_TOKEN = process.env.WORKER_TOKEN || '';
 const WORKER_ID = process.env.WORKER_ID || 'candidfan-storage-' + os.hostname();
+const PROCESSING_POOL = process.env.PROCESSING_POOL || 'local';
 const INBOX = resolve(process.env.INBOX_ROOT || '/root/videos');
 const MEDIA_ROOT = resolve(process.env.MEDIA_ROOT || '/srv/candidfan-media');
 const PROCESS_LIMIT = Number(process.env.PROCESS_LIMIT || 0);
@@ -194,12 +195,12 @@ async function failItem(item, error) {
 }
 
 async function main() {
-  const job = await api('/worker/scan');
+  const job = await api('/worker/scan?pool=' + encodeURIComponent(PROCESSING_POOL));
   const items = await inventory();
   await api('/worker/jobs/' + job.id + '/inventory', { method: 'POST', body: JSON.stringify({ items }) });
   let completed = 0;
   while (PROCESS_LIMIT === 0 || completed < PROCESS_LIMIT) {
-    const claim = await api('/worker/items/claim', { method: 'POST', body: JSON.stringify({ worker_id: WORKER_ID }) });
+    const claim = await api('/worker/items/claim', { method: 'POST', body: JSON.stringify({ worker_id: WORKER_ID, pool: PROCESSING_POOL }) });
     if (!claim.item) break;
     try {
       await processItem(claim.item);

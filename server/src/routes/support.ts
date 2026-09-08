@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { AuthRequest, requireAdmin, verifyToken } from '../middleware/auth.js';
+import { AuthRequest, verifyToken } from '../middleware/auth.js';
 import { supabaseAdmin } from '../config/supabase.js';
 
 const router = Router();
@@ -72,7 +72,13 @@ router.post('/:id/messages', verifyToken, async (req: AuthRequest, res) => {
   const body = text(req.body?.body, 10000);
   if (!body) return res.status(400).json({ error: 'Enter a message.' });
   const notifyEmail = req.user!.is_admin && req.body?.notify_email === true;
-  const ticket = await readTicket(req.params.id, req.user!.id, req.user!.is_admin);
+  let ticket;
+  try {
+    ticket = await readTicket(req.params.id, req.user!.id, req.user!.is_admin);
+  } catch {
+    console.error('support-reply-read-failed');
+    return res.status(500).json({ error: 'Unable to load support ticket.' });
+  }
   if (!ticket) return res.status(404).json({ error: 'Support ticket not found.' });
   if (ticket.status === 'closed' && !req.user!.is_admin) return res.status(409).json({ error: 'Reopen the ticket before replying.' });
   const { data, error } = await supabaseAdmin.rpc('add_support_message', {
@@ -94,7 +100,13 @@ router.post('/:id/status', verifyToken, async (req: AuthRequest, res) => {
   const status = req.body?.status;
   if (!['open', 'closed'].includes(status)) return res.status(400).json({ error: 'Invalid ticket status.' });
   if (status === 'closed' && !req.user!.is_admin) return res.status(403).json({ error: 'Only support staff can close tickets.' });
-  const ticket = await readTicket(req.params.id, req.user!.id, req.user!.is_admin);
+  let ticket;
+  try {
+    ticket = await readTicket(req.params.id, req.user!.id, req.user!.is_admin);
+  } catch {
+    console.error('support-status-read-failed');
+    return res.status(500).json({ error: 'Unable to load support ticket.' });
+  }
   if (!ticket) return res.status(404).json({ error: 'Support ticket not found.' });
   const { error } = await supabaseAdmin.from('support_tickets').update({ status, updated_at: new Date().toISOString() }).eq('id', req.params.id);
   if (error) {
@@ -102,23 +114,6 @@ router.post('/:id/status', verifyToken, async (req: AuthRequest, res) => {
     return res.status(500).json({ error: 'Unable to update ticket status.' });
   }
   return res.json({ status });
-});
-
-router.get('/admin/all', verifyToken, requireAdmin, async (_req: AuthRequest, res) => {
-  const { data, error } = await supabaseAdmin
-    .from('support_tickets')
-    .select('id, user_id, subject, status, created_at, updated_at')
-    .order('updated_at', { ascending: false })
-    .limit(100);
-  if (error) {
-    console.error('admin-support-list-failed');
-    return res.status(500).json({ error: 'Unable to load support tickets.' });
-  }
-  const ids = [...new Set((data || []).map((ticket) => ticket.user_id))];
-  const owners = ids.length ? await supabaseAdmin.from('users').select('id, email').in('id', ids) : { data: [], error: null };
-  if (owners.error) return res.status(500).json({ error: 'Unable to load ticket owners.' });
-  const emailById = new Map((owners.data || []).map((owner) => [owner.id, owner.email]));
-  return res.json((data || []).map((ticket) => ({ ...ticket, email: emailById.get(ticket.user_id) || 'unknown' })));
 });
 
 export default router;

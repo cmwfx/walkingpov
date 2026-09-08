@@ -7,6 +7,10 @@ const router = Router();
 const importerToken = process.env.IMPORTER_TOKEN || '';
 const internalSource = process.env.IMPORT_SOURCE_KIND || 'originals';
 
+function isUuid(value: unknown): value is string {
+  return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 function internalAuth(req: Request, res: Response, next: NextFunction) {
   const header = req.headers.authorization || '';
   if (!importerToken || !header.startsWith('Bearer ') || header.slice(7) !== importerToken) {
@@ -61,6 +65,7 @@ router.get('/jobs/next', internalAuth, async (_req, res) => {
 });
 
 router.post('/jobs/:id/scan', internalAuth, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'import_job_not_found' });
   const totalItems = Number.isSafeInteger(req.body?.total_items) ? req.body.total_items : 0;
   const totalBytes = Number.isSafeInteger(req.body?.total_bytes) ? req.body.total_bytes : 0;
   if (totalItems < 0 || totalBytes < 0) return res.status(400).json({ error: 'invalid_scan' });
@@ -70,6 +75,7 @@ router.post('/jobs/:id/scan', internalAuth, async (req, res) => {
 });
 
 router.post('/items/claim', internalAuth, async (req, res) => {
+  if (!isUuid(req.body?.job_id)) return res.status(400).json({ error: 'invalid_import_job' });
   const sourceIdentity = typeof req.body?.source_identity === 'string' ? req.body.source_identity : '';
   const title = typeof req.body?.title === 'string' ? req.body.title.trim() : '';
   const sourceSize = req.body?.source_size_bytes;
@@ -79,7 +85,7 @@ router.post('/items/claim', internalAuth, async (req, res) => {
   const storageKey = crypto.randomUUID();
   const thumbnailKey = '00000000-0000-4000-8000-000000000000';
   const { data, error } = await supabaseAdmin.rpc('claim_import_item', {
-    p_job_id: req.body?.job_id,
+    p_job_id: req.body.job_id,
     p_source_identity: sourceIdentity,
     p_title: title,
     p_source_size_bytes: sourceSize,
@@ -94,6 +100,7 @@ router.post('/items/claim', internalAuth, async (req, res) => {
 });
 
 router.post('/items/:id/publish', internalAuth, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'import_item_not_found' });
   const sizeBytes = req.body?.size_bytes;
   if (!Number.isSafeInteger(sizeBytes) || sizeBytes <= 0) return res.status(400).json({ error: 'invalid_size' });
   const { data, error } = await supabaseAdmin.rpc('publish_import_item', { p_item_id: req.params.id, p_size_bytes: sizeBytes });
@@ -107,6 +114,7 @@ router.post('/items/:id/publish', internalAuth, async (req, res) => {
 });
 
 router.post('/items/:id/fail', internalAuth, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'import_item_not_found' });
   const failureCode = typeof req.body?.error_code === 'string' ? req.body.error_code.replace(/[^a-z_]/g, '').slice(0, 80) : 'processing_failed';
   const { error } = await supabaseAdmin.rpc('record_import_failure', { p_item_id: req.params.id, p_error_code: failureCode || 'processing_failed' });
   if (error) return res.status(500).json({ error: 'import_item_failure_record_failed' });
@@ -114,6 +122,7 @@ router.post('/items/:id/fail', internalAuth, async (req, res) => {
 });
 
 router.post('/jobs/:id/complete', internalAuth, async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'import_job_not_found' });
   const { data: counts, error: countError } = await supabaseAdmin.from('import_items').select('status, source_size_bytes').eq('job_id', req.params.id);
   if (countError) return res.status(500).json({ error: 'import_counts_failed' });
   const rows = counts || [];

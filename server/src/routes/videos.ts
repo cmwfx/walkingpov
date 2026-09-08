@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
-import { AuthRequest, requireAdmin, verifyToken } from '../middleware/auth.js';
+import { AuthRequest, verifyToken } from '../middleware/auth.js';
 import { signMediaKey } from '../services/mediaSignature.js';
 
 const router = Router();
@@ -69,20 +69,6 @@ router.get('/:id/download', verifyToken, async (req: AuthRequest, res) => {
     url: `${mediaBaseUrl}/download/${encodeURIComponent(key)}?expires=${expires}&sig=${signature}`,
     expires_at: new Date(expires * 1000).toISOString(),
   });
-});
-
-router.get('/admin/stats', verifyToken, requireAdmin, async (_req: AuthRequest, res) => {
-  const [videos, users, payments, premium] = await Promise.all([
-    supabaseAdmin.from('videos').select('id', { count: 'exact', head: true }).eq('status', 'ready'),
-    supabaseAdmin.from('users').select('id', { count: 'exact', head: true }),
-    supabaseAdmin.from('payment_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
-    supabaseAdmin.from('users').select('id', { count: 'exact', head: true }).eq('membership_status', 'premium'),
-  ]);
-  if (videos.error || users.error || payments.error || premium.error) {
-    console.error('admin-stats-read-failed');
-    return res.status(500).json({ error: 'Unable to load admin statistics' });
-  }
-  return res.json({ total_videos: videos.count || 0, total_users: users.count || 0, pending_payments: payments.count || 0, premium_users: premium.count || 0 });
 });
 
 export default router;

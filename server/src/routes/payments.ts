@@ -45,15 +45,20 @@ router.get('/requests', verifyToken, requireAdmin, async (_req: AuthRequest, res
   const users = userIds.length ? await supabaseAdmin.from('users').select('id, email').in('id', userIds) : { data: [], error: null };
   if (users.error) return res.status(500).json({ error: 'Unable to load payment request owners.' });
   const emails = new Map((users.data || []).map((user) => [user.id, user.email]));
-  return res.json((data || []).map((row) => ({
-    id: row.id,
-    user_id: row.user_id,
-    email: emails.get(row.user_id) || 'unknown',
-    proof: isEncrypted(row.proof_encrypted) ? decrypt(row.proof_encrypted) : '',
-    status: row.status,
-    created_at: row.created_at,
-    notes: row.notes,
-  })));
+  try {
+    return res.json((data || []).map((row) => ({
+      id: row.id,
+      user_id: row.user_id,
+      email: emails.get(row.user_id) || 'unknown',
+      proof: isEncrypted(row.proof_encrypted) ? decrypt(row.proof_encrypted) : '',
+      status: row.status,
+      created_at: row.created_at,
+      notes: row.notes,
+    })));
+  } catch {
+    console.error('payment-proof-read-failed');
+    return res.status(500).json({ error: 'Unable to load payment proofs.' });
+  }
 });
 
 router.post('/:id/review', verifyToken, requireAdmin, async (req: AuthRequest, res) => {

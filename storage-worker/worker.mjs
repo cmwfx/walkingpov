@@ -109,7 +109,7 @@ async function copyAndHash(source, destination) {
 
 async function diskIsHealthy() {
   const fsStats = await statfsCompat(MEDIA_ROOT);
-  return Number(fsStats.available) / Number(fsStats.blocks) >= 0.15;
+  return Number(fsStats.bavail) / Number(fsStats.blocks) >= 0.15;
 }
 
 async function statfsCompat(path) {

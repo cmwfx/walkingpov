@@ -67,7 +67,7 @@ export function VideoCard({ video }: VideoCardProps) {
               <img
                 src={primaryUrl}
                 alt={video.title}
-                className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-105 ${
+                className={`w-full h-full object-contain transition-all duration-700 ${
                   imageLoaded ? 'opacity-100' : 'opacity-0'
                 }`}
                 onLoad={() => setImageLoaded(true)}
@@ -78,7 +78,7 @@ export function VideoCard({ video }: VideoCardProps) {
             <img
               src={imageSrc}
               alt={video.title}
-              className={`w-full h-full object-cover transition-all duration-700 group-hover:scale-105 ${
+              className={`w-full h-full object-contain transition-all duration-700 ${
                 imageLoaded ? 'opacity-100' : 'opacity-0'
               }`}
               onLoad={() => setImageLoaded(true)}

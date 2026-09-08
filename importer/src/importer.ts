@@ -1,4 +1,3 @@
-import 'dotenv/config';
 import { createHash, randomUUID } from 'node:crypto';
 import { copyFile, mkdir, opendir, rename, stat, lstat, access } from 'node:fs/promises';
 import path from 'node:path';

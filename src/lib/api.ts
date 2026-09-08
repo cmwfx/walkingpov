@@ -1,202 +1,49 @@
-import { API_URL } from './utils';
 import { supabase } from './supabase';
+import { API_URL } from './utils';
 
 let csrfToken: string | null = null;
 
-/**
- * Fetches CSRF token from the server
- */
-async function getCsrfToken(): Promise<string> {
-  if (csrfToken) {
-    return csrfToken;
-  }
-
-  try {
-    const response = await fetch(`${API_URL}/api/csrf-token`, {
-      credentials: 'include', // Important: include cookies
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch CSRF token');
-    }
-
-    const data = await response.json();
-    const token = data.csrfToken || '';
-    csrfToken = token;
-    return token;
-  } catch (error) {
-    console.error('Error fetching CSRF token:', error);
-    throw error;
-  }
+async function getCsrfToken() {
+  if (csrfToken) return csrfToken;
+  const response = await fetch(`${API_URL}/api/csrf-token`, { credentials: 'include' });
+  if (!response.ok) throw new Error('Unable to start a secure request.');
+  csrfToken = (await response.json()).csrfToken || null;
+  if (!csrfToken) throw new Error('Unable to start a secure request.');
+  return csrfToken;
 }
 
-export async function getAuthHeaders() {
-  const { data: { session } } = await supabase.auth.getSession();
-
-  if (!session?.access_token) {
-    throw new Error('Not authenticated');
-  }
-
-  const csrf = await getCsrfToken();
-
+async function authHeaders(mutate = false) {
+  const { data } = await supabase.auth.getSession();
+  if (!data.session?.access_token) throw new Error('Please sign in to continue.');
   return {
-    'Authorization': `Bearer ${session.access_token}`,
-    'Content-Type': 'application/json',
-    'X-CSRF-Token': csrf,
+    Authorization: `Bearer ${data.session.access_token}`,
+    ...(mutate ? { 'Content-Type': 'application/json', 'X-CSRF-Token': await getCsrfToken() } : {}),
   };
 }
 
-export async function uploadThumbnail(file: File): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
-
-  if (!session?.access_token) {
-    throw new Error('Not authenticated');
-  }
-
-  const csrf = await getCsrfToken();
-  const formData = new FormData();
-  formData.append('thumbnail', file);
-
-  const response = await fetch(`${API_URL}/api/upload/thumbnail`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${session.access_token}`,
-      'X-CSRF-Token': csrf,
-    },
-    credentials: 'include', // Important: include cookies
-    body: formData
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to upload thumbnail');
-  }
-
-  const data = await response.json();
-  return `${API_URL}${data.url}`;
+async function request<T>(pathname: string, init: RequestInit = {}, authenticated = false): Promise<T> {
+  const mutate = Boolean(init.method && !['GET', 'HEAD', 'OPTIONS'].includes(init.method));
+  const headers = { ...(init.headers || {}), ...(authenticated ? await authHeaders(mutate) : mutate ? { 'Content-Type': 'application/json', 'X-CSRF-Token': await getCsrfToken() } : {}) };
+  const response = await fetch(`${API_URL}${pathname}`, { ...init, headers, credentials: 'include' });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(body.error || 'Request failed.');
+  return body as T;
 }
 
-export async function getVideos(page: number = 1, tag?: string) {
-  const url = new URL(`${API_URL}/api/videos`);
-  url.searchParams.set('page', page.toString());
-  if (tag) {
-    url.searchParams.set('tag', tag);
-  }
-
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error('Failed to fetch videos');
-  }
-
-  return response.json();
-}
-
-export async function getVideo(id: string) {
-  const response = await fetch(`${API_URL}/api/videos/${id}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch video');
-  }
-
-  return response.json();
-}
-
-export async function getDownloadLinks(videoId: string) {
-  const headers = await getAuthHeaders();
-
-  const response = await fetch(`${API_URL}/api/videos/${videoId}/downloads`, {
-    headers
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch download links');
-  }
-
-  return response.json();
-}
-
-export async function createVideo(data: {
-  title: string;
-  thumbnail_url: string;
-  tags: string[];
-  download_links: { label: string; url: string }[];
-}) {
-  const headers = await getAuthHeaders();
-
-  const response = await fetch(`${API_URL}/api/videos`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(data)
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to create video');
-  }
-
-  return response.json();
-}
-
-export async function bulkUploadFromJson(videos: any[]) {
-  const headers = await getAuthHeaders();
-
-  const response = await fetch(`${API_URL}/api/bulk-upload/json`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ videos })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to upload videos');
-  }
-
-  return response.json();
-}
-
-// Async bulk upload - Start job
-export async function startBulkUpload(videos: any[]): Promise<{ jobId: string }> {
-  const headers = await getAuthHeaders();
-
-  const response = await fetch(`${API_URL}/api/bulk-upload/json/start`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ videos })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to start bulk upload');
-  }
-
-  return response.json();
-}
-
-// Get bulk upload job status
-export interface BulkUploadJobStatus {
-  id: string;
-  totalVideos: number;
-  processed: number;
-  successful: number;
-  failed: number;
-  status: 'processing' | 'completed' | 'failed';
-  errors: Array<{
-    index: number;
-    title: string;
-    error: string;
-  }>;
-  startedAt: string;
-  completedAt?: string;
-}
-
-export async function getBulkUploadStatus(jobId: string): Promise<BulkUploadJobStatus> {
-  const headers = await getAuthHeaders();
-
-  const response = await fetch(`${API_URL}/api/bulk-upload/json/status/${jobId}`, {
-    headers
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to get upload status');
-  }
-
-  return response.json();
-}
+export const getMe = () => request<{ user: import('./supabase').User }>('/api/me', {}, true);
+export const getVideos = (page = 1, tag = '') => request<{ videos: import('./supabase').Video[]; pagination: { page: number; total: number; totalPages: number } }>(`/api/videos?page=${page}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`);
+export const getVideo = (id: string) => request<import('./supabase').Video>(`/api/videos/${encodeURIComponent(id)}`);
+export const getDownloadUrl = (id: string) => request<{ url: string; expires_at: string }>(`/api/videos/${encodeURIComponent(id)}/download`, {}, true);
+export const submitPayment = (proof: string) => request('/api/payments/submit', { method: 'POST', body: JSON.stringify({ proof }) }, true);
+export const getPaymentRequests = () => request<import('./supabase').PaymentRequest[]>('/api/payments/requests', {}, true);
+export const reviewPayment = (id: string, decision: 'approved' | 'denied', notes: string) => request(`/api/payments/${id}/review`, { method: 'POST', body: JSON.stringify({ decision, notes }) }, true);
+export const getAdminStats = () => request<{ total_videos: number; total_users: number; pending_payments: number; premium_users: number }>('/api/admin/stats', {}, true);
+export const getTickets = () => request<import('./supabase').SupportTicket[]>('/api/support', {}, true);
+export const createTicket = (subject: string, body: string) => request<{ id: string }>('/api/support', { method: 'POST', body: JSON.stringify({ subject, body }) }, true);
+export const getTicket = (id: string) => request<import('./supabase').SupportTicket & { messages: import('./supabase').SupportMessage[] }>(`/api/support/${encodeURIComponent(id)}`, {}, true);
+export const replyTicket = (id: string, body: string, notifyEmail = false) => request(`/api/support/${encodeURIComponent(id)}/messages`, { method: 'POST', body: JSON.stringify({ body, notify_email: notifyEmail }) }, true);
+export const setTicketStatus = (id: string, status: 'open' | 'closed') => request(`/api/support/${encodeURIComponent(id)}/status`, { method: 'POST', body: JSON.stringify({ status }) }, true);
+export const getAdminTickets = () => request<import('./supabase').SupportTicket[]>('/api/admin/support', {}, true);
+export const getImportJobs = () => request<import('./supabase').ImportJob[]>('/api/import/admin/jobs', {}, true);
+export const startImport = () => request<import('./supabase').ImportJob>('/api/import/admin/jobs', { method: 'POST', body: '{}' }, true);
+export const resumeImport = (id: string) => request(`/api/import/admin/jobs/${encodeURIComponent(id)}/resume`, { method: 'POST', body: '{}' }, true);

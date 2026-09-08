@@ -1,169 +1,80 @@
-import express, { Response } from 'express';
-import { AuthRequest, verifyToken, requireAdmin } from '../middleware/auth.js';
-import { sendApprovalEmail, sendDenialEmail } from '../services/email.js';
-import { encrypt, decrypt, isEncrypted } from '../services/encryption.js';
+import { Router } from 'express';
+import { AuthRequest, requireAdmin, verifyToken } from '../middleware/auth.js';
+import { paymentLimiter } from '../middleware/rateLimiter.js';
 import { supabaseAdmin } from '../config/supabase.js';
-import { paymentLimiter, emailLimiter } from '../middleware/rateLimiter.js';
-import { logAuditAction } from '../services/auditLog.js';
+import { encrypt, decrypt, isEncrypted } from '../services/encryption.js';
 
-const router = express.Router();
+const router = Router();
 
-// @route   POST /api/payments/submit
-// @desc    Submit payment proof with encryption
-// @access  Authenticated users
-router.post('/submit', paymentLimiter, verifyToken, async (req: AuthRequest, res: Response) => {
+function errorCode(error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  return message.replace(/[^a-z_]/g, '').slice(0, 60);
+}
+
+router.post('/submit', paymentLimiter, verifyToken, async (req: AuthRequest, res) => {
+  const proof = typeof req.body?.proof === 'string' ? req.body.proof.trim() : '';
+  if (!proof || proof.length > 500) return res.status(400).json({ error: 'Enter a valid gift card proof.' });
   try {
-    const { payment_type, proof } = req.body;
-
-    if (!payment_type || !proof) {
-      return res.status(400).json({ error: 'Payment type and proof are required' });
-    }
-
-    if (!['crypto', 'giftcard'].includes(payment_type)) {
-      return res.status(400).json({ error: 'Invalid payment type' });
-    }
-
-    // Validate proof length (max 500 characters)
-    if (proof.length > 500) {
-      return res.status(400).json({ error: 'Payment proof too long (max 500 characters)' });
-    }
-
-    // Encrypt the sensitive proof data
-    const encryptedProof = encrypt(proof.trim());
-
-    // Insert payment request
-    const { error: insertError } = await supabaseAdmin
-      .from('payment_requests')
-      .insert({
-        user_id: req.user!.id,
-        payment_type,
-        proof: encryptedProof,
-        status: 'pending',
-      });
-
-    if (insertError) {
-      console.error('Payment insert error:', insertError);
-      throw insertError;
-    }
-
-    // Update user's payment info
-    const { error: updateError } = await supabaseAdmin
-      .from('users')
-      .update({
-        payment_method: payment_type,
-        payment_proof: encryptedProof,
-        membership_status: 'pending',
-      })
-      .eq('id', req.user!.id);
-
-    if (updateError) {
-      console.error('User update error:', updateError);
-      throw updateError;
-    }
-
-    res.json({ message: 'Payment submitted successfully' });
-  } catch (error) {
-    console.error('Payment submission error:', error);
-    res.status(500).json({ error: 'Failed to submit payment' });
-  }
-});
-
-// @route   GET /api/payments/requests
-// @desc    Get payment requests with decrypted proof (admin only)
-// @access  Admin
-router.get('/requests', verifyToken, requireAdmin, async (req: AuthRequest, res: Response) => {
-  try {
-    const { data: requests, error } = await supabaseAdmin
-      .from('payment_requests')
-      .select('*')
-      .eq('status', 'pending')
-      .order('created_at', { ascending: true });
-
+    const encrypted = encrypt(proof);
+    const { error } = await supabaseAdmin.rpc('submit_payment_request', {
+      p_user_id: req.user!.id,
+      p_proof_encrypted: encrypted,
+    });
     if (error) throw error;
-
-    // Decrypt proof data for admin view
-    const decryptedRequests = requests?.map(request => ({
-      ...request,
-      proof: isEncrypted(request.proof) ? decrypt(request.proof) : request.proof,
-    })) || [];
-
-    res.json(decryptedRequests);
+    return res.status(201).json({ message: 'Your gift card proof was submitted for review.' });
   } catch (error) {
-    console.error('Error fetching payment requests:', error);
-    res.status(500).json({ error: 'Failed to fetch payment requests' });
+    const code = errorCode(error);
+    if (code.includes('pending_exists')) return res.status(409).json({ error: 'You already have a payment awaiting review.' });
+    if (code.includes('already_premium')) return res.status(409).json({ error: 'Your membership is already active.' });
+    console.error('payment-submit-failed');
+    return res.status(500).json({ error: 'Unable to submit payment proof.' });
   }
 });
 
-// @route   POST /api/payments/notify-review
-// @desc    Send email notification for payment review
-// @access  Admin
-router.post('/notify-review', emailLimiter, verifyToken, requireAdmin, async (req: AuthRequest, res: Response) => {
+router.get('/requests', verifyToken, requireAdmin, async (_req: AuthRequest, res) => {
+  const { data, error } = await supabaseAdmin
+    .from('payment_requests')
+    .select('id, user_id, proof_encrypted, status, created_at, notes')
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+  if (error) {
+    console.error('payment-requests-read-failed');
+    return res.status(500).json({ error: 'Unable to load payment requests.' });
+  }
+  const userIds = [...new Set((data || []).map((row) => row.user_id))];
+  const users = userIds.length ? await supabaseAdmin.from('users').select('id, email').in('id', userIds) : { data: [], error: null };
+  if (users.error) return res.status(500).json({ error: 'Unable to load payment request owners.' });
+  const emails = new Map((users.data || []).map((user) => [user.id, user.email]));
+  return res.json((data || []).map((row) => ({
+    id: row.id,
+    user_id: row.user_id,
+    email: emails.get(row.user_id) || 'unknown',
+    proof: isEncrypted(row.proof_encrypted) ? decrypt(row.proof_encrypted) : '',
+    status: row.status,
+    created_at: row.created_at,
+    notes: row.notes,
+  })));
+});
+
+router.post('/:id/review', verifyToken, requireAdmin, async (req: AuthRequest, res) => {
+  const decision = req.body?.decision;
+  const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim().slice(0, 2000) : null;
+  if (!['approved', 'denied'].includes(decision)) return res.status(400).json({ error: 'Choose approved or denied.' });
   try {
-    const { email, status, reason } = req.body;
-
-    if (!email || !status) {
-      return res.status(400).json({ error: 'Email and status are required' });
-    }
-
-    // Validate status
-    if (!['approved', 'denied'].includes(status)) {
-      return res.status(400).json({ error: 'Invalid status. Must be "approved" or "denied".' });
-    }
-
-    // Validate email exists in users table
-    const { data: user, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('email, id')
-      .eq('email', email)
-      .single();
-
-    if (userError || !user) {
-      return res.status(400).json({
-        error: 'Email not found. Can only notify registered users.',
-      });
-    }
-
-    // Validate payment request exists for this user
-    const { data: paymentRequest, error: paymentError } = await supabaseAdmin
-      .from('payment_requests')
-      .select('id, status')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
-
-    if (paymentError || !paymentRequest) {
-      return res.status(400).json({
-        error: 'No payment request found for this user.',
-      });
-    }
-
-    // Send appropriate email
-    if (status === 'approved') {
-      await sendApprovalEmail(email);
-    } else {
-      await sendDenialEmail(email, reason);
-    }
-
-    // Log the admin action
-    await logAuditAction(
-      req.user!.id,
-      `payment_${status}`,
-      'payment_request',
-      req,
-      {
-        target_user_email: email,
-        target_user_id: user.id,
-        payment_request_id: paymentRequest.id,
-        reason: reason || null,
-      },
-      paymentRequest.id
-    );
-
-    res.json({ message: 'Notification email sent successfully' });
+    const { error } = await supabaseAdmin.rpc('review_payment_request', {
+      p_request_id: req.params.id,
+      p_admin_id: req.user!.id,
+      p_decision: decision,
+      p_notes: notes,
+    });
+    if (error) throw error;
+    return res.json({ message: 'Payment review saved.' });
   } catch (error) {
-    console.error('Error sending payment notification:', error);
-    res.status(500).json({ error: 'Failed to send notification email' });
+    const code = errorCode(error);
+    if (code.includes('already_reviewed')) return res.status(409).json({ error: 'This request was already reviewed.' });
+    if (code.includes('not_found')) return res.status(404).json({ error: 'Payment request not found.' });
+    console.error('payment-review-failed');
+    return res.status(500).json({ error: 'Unable to save payment review.' });
   }
 });
 

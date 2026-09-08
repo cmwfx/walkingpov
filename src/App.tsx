@@ -1,8 +1,7 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { AuthProvider } from './hooks/useAuth';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
-
-// Pages - will be created next
 import { Home } from './pages/Home';
 import { VideoDetail } from './pages/VideoDetail';
 import { Login } from './pages/Login';
@@ -12,85 +11,29 @@ import { ForgotPassword } from './pages/ForgotPassword';
 import { ResetPassword } from './pages/ResetPassword';
 import { PaymentSubmit } from './pages/PaymentSubmit';
 import { Dashboard } from './pages/Dashboard';
+import { Support } from './pages/Support';
+import { SupportTicket } from './pages/SupportTicket';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
-import { CreateVideo } from './pages/admin/CreateVideo';
 import { ReviewPayments } from './pages/admin/ReviewPayments';
-import { BulkUpload } from './pages/admin/BulkUpload';
+import { AdminSupport } from './pages/admin/AdminSupport';
+import { ImportJobs } from './pages/admin/ImportJobs';
 
-function App() {
-  return (
-    <BrowserRouter
-      future={{
-        v7_startTransition: true,
-        v7_relativeSplatPath: true,
-      }}
-    >
-      <Routes>
-        <Route element={<Layout />}>
-          {/* Public routes */}
-          <Route path="/" element={<Home />} />
-          <Route path="/video/:id" element={<VideoDetail />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<Signup />} />
-          <Route path="/verify-email" element={<VerifyEmail />} />
-          <Route path="/forgot-password" element={<ForgotPassword />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-
-          {/* Protected routes - require auth */}
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute requireAuth>
-                <Dashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/payment"
-            element={
-              <ProtectedRoute requireAuth>
-                <PaymentSubmit />
-              </ProtectedRoute>
-            }
-          />
-
-          {/* Admin routes */}
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute requireAuth requireAdmin>
-                <AdminDashboard />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/create-video"
-            element={
-              <ProtectedRoute requireAuth requireAdmin>
-                <CreateVideo />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/review-payments"
-            element={
-              <ProtectedRoute requireAuth requireAdmin>
-                <ReviewPayments />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/bulk-upload"
-            element={
-              <ProtectedRoute requireAuth requireAdmin>
-                <BulkUpload />
-              </ProtectedRoute>
-            }
-          />
-        </Route>
-      </Routes>
-    </BrowserRouter>
-  );
+export default function App() {
+  return <AuthProvider><BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><Routes><Route element={<Layout />}>
+    <Route path="/" element={<Home />} />
+    <Route path="/video/:id" element={<VideoDetail />} />
+    <Route path="/login" element={<Login />} />
+    <Route path="/signup" element={<Signup />} />
+    <Route path="/verify-email" element={<VerifyEmail />} />
+    <Route path="/forgot-password" element={<ForgotPassword />} />
+    <Route path="/reset-password" element={<ResetPassword />} />
+    <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+    <Route path="/payment" element={<ProtectedRoute><PaymentSubmit /></ProtectedRoute>} />
+    <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
+    <Route path="/support/:id" element={<ProtectedRoute><SupportTicket /></ProtectedRoute>} />
+    <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />
+    <Route path="/admin/payments" element={<ProtectedRoute adminOnly><ReviewPayments /></ProtectedRoute>} />
+    <Route path="/admin/support" element={<ProtectedRoute adminOnly><AdminSupport /></ProtectedRoute>} />
+    <Route path="/admin/import" element={<ProtectedRoute adminOnly><ImportJobs /></ProtectedRoute>} />
+  </Route></Routes></BrowserRouter></AuthProvider>;
 }
-
-export default App;

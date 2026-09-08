@@ -1,0 +1,20 @@
+[Unit]
+Description=CandidFan durable media importer
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/candidfan-importer
+EnvironmentFile=/etc/candidfan/importer.env
+ExecStart=/usr/bin/node /opt/candidfan-importer/dist/importer.js
+Restart=always
+RestartSec=10
+NoNewPrivileges=true
+ProtectHome=read-only
+ReadOnlyPaths=/root/videos
+ReadWritePaths=/srv/candidfan
+
+[Install]
+WantedBy=multi-user.target

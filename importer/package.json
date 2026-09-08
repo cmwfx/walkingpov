@@ -1,0 +1,7 @@
+{
+  "name": "candidfan-importer",
+  "private": true,
+  "type": "module",
+  "scripts": { "build": "tsc", "start": "node dist/importer.js" },
+  "devDependencies": { "@types/node": "^20.11.5", "typescript": "^5.3.3" }
+}

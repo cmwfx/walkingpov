@@ -47,3 +47,4 @@ Thumbs.db
 
 # Documentation files (root level only)
 /*.md
+!/plan.md

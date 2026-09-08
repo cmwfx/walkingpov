@@ -1,4 +1,0 @@
--- THIS FILE IS OUTDATED - USE fix-infinite-recursion.sql INSTEAD
--- 
--- The policies in this file cause infinite recursion!
--- Run fix-infinite-recursion.sql to fix the issue.

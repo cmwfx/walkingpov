@@ -24,7 +24,7 @@ export function DiscountTimer() {
   const formatTime = (val: number) => val.toString().padStart(2, '0');
 
   return (
-    <div className="flex items-center gap-2 text-sm font-semibold text-primary animate-pulse">
+    <div className="flex items-center gap-2 text-sm font-semibold text-violet-200 animate-pulse">
       <Timer className="h-4 w-4" />
       <span>
         Offer ends in: {formatTime(timeLeft.hours)}:{formatTime(timeLeft.minutes)}:{formatTime(timeLeft.seconds)}

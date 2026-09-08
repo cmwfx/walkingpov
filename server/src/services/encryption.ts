@@ -1,87 +1,34 @@
-import crypto from 'crypto';
+import crypto from 'node:crypto';
 
-const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || '';
-const ALGORITHM = 'aes-256-gcm';
+const keyText = process.env.ENCRYPTION_KEY || '';
+if (!/^[0-9a-fA-F]{64}$/.test(keyText)) {
+  throw new Error('ENCRYPTION_KEY must be 32 bytes encoded as hex');
+}
+const key = Buffer.from(keyText, 'hex');
+const algorithm = 'aes-256-gcm';
 
-if (!ENCRYPTION_KEY || ENCRYPTION_KEY.length !== 64) {
-  console.warn('WARNING: ENCRYPTION_KEY is not set or invalid. Payment data will not be properly encrypted.');
+export function encrypt(plainText: string): string {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv(algorithm, key, iv);
+  const ciphertext = Buffer.concat([cipher.update(plainText, 'utf8'), cipher.final()]);
+  const tag = cipher.getAuthTag();
+  return `${iv.toString('hex')}:${tag.toString('hex')}:${ciphertext.toString('hex')}`;
 }
 
-/**
- * Encrypts text using AES-256-GCM
- * @param text - The plaintext to encrypt
- * @returns Encrypted string in format: iv:authTag:encrypted
- */
-export function encrypt(text: string): string {
-  if (!text) return '';
-
+export function decrypt(value: string): string {
+  const parts = value.split(':');
+  if (parts.length !== 3 || !/^[0-9a-f]{24}$/i.test(parts[0]) || !/^[0-9a-f]{32}$/i.test(parts[1])) {
+    throw new Error('encrypted_value_invalid');
+  }
   try {
-    const iv = crypto.randomBytes(16);
-    const cipher = crypto.createCipheriv(
-      ALGORITHM,
-      Buffer.from(ENCRYPTION_KEY, 'hex'),
-      iv
-    );
-
-    let encrypted = cipher.update(text, 'utf8', 'hex');
-    encrypted += cipher.final('hex');
-    const authTag = cipher.getAuthTag();
-
-    return iv.toString('hex') + ':' + authTag.toString('hex') + ':' + encrypted;
-  } catch (error) {
-    console.error('Encryption error:', error);
-    throw new Error('Failed to encrypt data');
+    const decipher = crypto.createDecipheriv(algorithm, key, Buffer.from(parts[0], 'hex'));
+    decipher.setAuthTag(Buffer.from(parts[1], 'hex'));
+    return Buffer.concat([decipher.update(Buffer.from(parts[2], 'hex')), decipher.final()]).toString('utf8');
+  } catch {
+    throw new Error('encrypted_value_invalid');
   }
 }
 
-/**
- * Decrypts text encrypted with the encrypt function
- * @param text - Encrypted string in format: iv:authTag:encrypted
- * @returns Decrypted plaintext
- */
-export function decrypt(text: string): string {
-  if (!text) return '';
-
-  // If the text doesn't contain colons, it might be unencrypted legacy data
-  if (!text.includes(':')) {
-    console.warn('Attempting to decrypt data that appears to be unencrypted');
-    return text;
-  }
-
-  try {
-    const parts = text.split(':');
-    if (parts.length !== 3) {
-      throw new Error('Invalid encrypted data format');
-    }
-
-    const iv = Buffer.from(parts[0], 'hex');
-    const authTag = Buffer.from(parts[1], 'hex');
-    const encrypted = parts[2];
-
-    const decipher = crypto.createDecipheriv(
-      ALGORITHM,
-      Buffer.from(ENCRYPTION_KEY, 'hex'),
-      iv
-    );
-    decipher.setAuthTag(authTag);
-
-    let decrypted = decipher.update(encrypted, 'hex', 'utf8');
-    decrypted += decipher.final('utf8');
-
-    return decrypted;
-  } catch (error) {
-    console.error('Decryption error:', error);
-    throw new Error('Failed to decrypt data');
-  }
-}
-
-/**
- * Checks if a string appears to be encrypted
- * @param text - String to check
- * @returns true if the string appears to be in encrypted format
- */
-export function isEncrypted(text: string): boolean {
-  if (!text) return false;
-  const parts = text.split(':');
-  return parts.length === 3 && parts[0].length === 32 && parts[1].length === 32;
+export function isEncrypted(value: string): boolean {
+  return /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/i.test(value);
 }

@@ -4,7 +4,6 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import express, { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
-import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { generateCsrfToken, verifyCsrfToken } from './middleware/csrf.js';
@@ -75,7 +74,7 @@ export function createApp() {
   return app;
 }
 
-const isMain = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(fileURLToPath(import.meta.url));
+const isMain = process.argv[1] && path.basename(process.argv[1]) === 'index.js';
 if (isMain) {
   const port = Number(process.env.PORT || 3001);
   const app = createApp();

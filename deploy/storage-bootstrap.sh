@@ -14,6 +14,7 @@ certbot_email="${CERTBOT_EMAIL:?CERTBOT_EMAIL is required}"
 command -v git >/dev/null || { apt-get update -qq && apt-get install -y -qq git; }
 command -v nginx >/dev/null || { apt-get update -qq && apt-get install -y -qq nginx; }
 command -v certbot >/dev/null || { apt-get update -qq && apt-get install -y -qq certbot; }
+command -v node >/dev/null && command -v npm >/dev/null || { apt-get update -qq && apt-get install -y -qq nodejs npm; }
 
 if [[ ! -d "${repo_dir}/.git" ]]; then
   git clone --branch "${branch}" --single-branch "${repo_url}" "${repo_dir}"

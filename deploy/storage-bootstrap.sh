@@ -24,6 +24,7 @@ else
 fi
 
 id -u candidfan-media >/dev/null 2>&1 || useradd --system --home-dir /opt/candidfan-media --shell /usr/sbin/nologin candidfan-media
+usermod --append --groups www-data candidfan-media
 install -d -m 0755 /opt/candidfan-media /opt/candidfan-importer
 install -d -m 0755 /srv/candidfan
 install -d -m 0750 -o root -g www-data /srv/candidfan/media /srv/candidfan/thumbnails

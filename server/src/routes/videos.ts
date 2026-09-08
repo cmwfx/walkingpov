@@ -5,6 +5,7 @@ import { signMediaKey } from '../services/mediaSignature.js';
 
 const router = Router();
 const pageSize = 24;
+const DOWNLOAD_LINK_VALIDITY_SECONDS = 60 * 60;
 const mediaBaseUrl = (process.env.MEDIA_BASE_URL || 'https://media.candidfan.com').replace(/\/$/, '');
 const mediaSigningSecret = process.env.MEDIA_SIGNING_SECRET || '';
 
@@ -62,7 +63,7 @@ router.get('/:id/download', verifyToken, async (req: AuthRequest, res) => {
     .eq('video_id', req.params.id)
     .maybeSingle();
   if (error || !data) return res.status(404).json({ error: 'Video file is not ready' });
-  const expires = Math.floor(Date.now() / 1000) + 15 * 60;
+  const expires = Math.floor(Date.now() / 1000) + DOWNLOAD_LINK_VALIDITY_SECONDS;
   const key = String(data.storage_key);
   const signature = signMediaKey(key, expires, mediaSigningSecret);
   return res.json({

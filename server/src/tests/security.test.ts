@@ -5,10 +5,12 @@ import { verifyMediaSignature, signMediaKey } from '../services/mediaSignature.j
 test('media signatures accept a valid opaque key and reject tampering, expiry, and traversal', () => {
   const key = '11111111-1111-4111-8111-111111111111';
   const now = 1_800_000_000;
-  const expires = now + 900;
+  const expires = now + 60 * 60 - 1;
   const secret = 'test-media-signing-secret';
   const signature = signMediaKey(key, expires, secret);
   assert.equal(verifyMediaSignature(key, String(expires), signature, secret, now), true);
+  const tooFarExpires = now + 60 * 60 + 1;
+  assert.equal(verifyMediaSignature(key, String(tooFarExpires), signMediaKey(key, tooFarExpires, secret), secret, now), false);
   assert.equal(verifyMediaSignature(key, String(expires), `${signature.slice(0, -1)}0`, secret, now), false);
   assert.equal(verifyMediaSignature(key, String(now - 1), signMediaKey(key, now - 1, secret), secret, now), false);
   assert.equal(verifyMediaSignature('../source.mp4', String(expires), signature, secret, now), false);

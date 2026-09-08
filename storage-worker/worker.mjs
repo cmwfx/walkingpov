@@ -61,7 +61,7 @@ async function inventory() {
   for (const filePath of files) {
     if (!(await isVideo(filePath))) continue;
     const first = await stat(filePath);
-    await sleep(150);
+    await sleep(25);
     const second = await stat(filePath);
     if (first.size !== second.size || first.mtimeMs !== second.mtimeMs) continue;
     const sourceName = safeRelative(filePath);

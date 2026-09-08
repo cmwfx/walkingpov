@@ -77,9 +77,6 @@ export function VideoCard({ video, onFeaturedChange }: VideoCardProps) {
             <img src={imageSrc} alt={video.title} className={`h-full w-full object-contain transition-opacity duration-700 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`} onLoad={() => setImageLoaded(true)} onError={() => setImageLoaded(true)} />
           ) : null}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-75" />
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-
           <div className="absolute inset-0 z-10 flex items-center justify-center opacity-0 transition-all duration-300 group-hover:opacity-100">
             <div className="relative">
               <div className="absolute inset-0 rounded-full bg-purple-500 opacity-50 blur-2xl" />
@@ -93,26 +90,22 @@ export function VideoCard({ video, onFeaturedChange }: VideoCardProps) {
             <span className="text-xs font-semibold text-white">4K</span>
           </div>
 
-          <div className="absolute inset-x-0 bottom-0 z-20 p-5">
-            <div>
-              {video.is_featured && !isAdmin && (
-                <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-yellow-300/30 bg-black/50 px-3 py-1 text-xs font-medium text-yellow-200 backdrop-blur-sm">
-                  <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
-                  <span>Featured</span>
-                </div>
-              )}
-              <h3 className="mb-3 line-clamp-2 text-lg font-bold leading-tight text-white drop-shadow-2xl md:text-xl">{video.title}</h3>
-              <div className="flex items-center gap-3 text-sm text-gray-200">
-                <div className="flex items-center gap-1 rounded-full bg-black/40 px-3 py-1 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
-                  <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
-                  <span className="font-medium">Exclusive</span>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
 
         <div className="p-5">
+          {video.is_featured && !isAdmin && (
+            <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-yellow-300/30 bg-yellow-300/10 px-3 py-1 text-xs font-medium text-yellow-200">
+              <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
+              <span>Featured</span>
+            </div>
+          )}
+          <h3 className="mb-3 line-clamp-2 text-lg font-bold leading-tight text-white md:text-xl">{video.title}</h3>
+          <div className="mb-4 flex items-center gap-3 text-sm text-gray-200">
+            <div className="flex items-center gap-1 rounded-full bg-black/30 px-3 py-1 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+              <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
+              <span className="font-medium">Exclusive</span>
+            </div>
+          </div>
           {video.tags && video.tags.length > 0 && (
             <div className="flex items-start gap-2.5">
               <Tag className="mt-1 h-4 w-4 flex-shrink-0 text-purple-400" />

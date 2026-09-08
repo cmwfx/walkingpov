@@ -1,24 +1,176 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import { useEffect, useState } from 'react';
-import { ArrowLeft, Check, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { getPaymentRequests, reviewPayment } from '@/lib/api';
+import { useCallback, useEffect, useState } from 'react';
 import type { PaymentRequest } from '@/lib/supabase';
+import { getPaymentRequests, reviewPayment } from '@/lib/api';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/components/ui/use-toast';
+import { CheckCircle, XCircle, Clock, ArrowLeft, User as UserIcon } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { formatDate } from '@/lib/utils';
 
 export function ReviewPayments() {
   const [requests, setRequests] = useState<PaymentRequest[]>([]);
-  const [error, setError] = useState('');
-  const load = async () => { try { setRequests(await getPaymentRequests()); } catch { setError('Unable to load payment requests.'); } };
-  useEffect(() => { void load(); }, []);
-  const decide = async (id: string, decision: 'approved' | 'denied', notes: string) => { try { await reviewPayment(id, decision, notes); await load(); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Unable to save review.'); } };
-  return <div className="container mx-auto max-w-4xl px-4 py-10"><Link to="/admin"><Button variant="ghost" className="text-slate-300"><ArrowLeft className="mr-2 h-4 w-4" />Admin</Button></Link><Card className="mt-5 border-white/10 bg-white/[0.05] text-white"><CardHeader><CardTitle>Payment review</CardTitle><p className="text-sm text-slate-400">Gift card proofs are decrypted only in this owner/admin view.</p></CardHeader><CardContent className="space-y-5">{error && <p className="text-sm text-rose-300">{error}</p>}{requests.length === 0 && <p className="text-sm text-slate-500">No pending payments.</p>}{requests.map((request) => <PaymentRow key={request.id} request={request} onDecide={decide} />)}</CardContent></Card></div>;
-}
+  const [loading, setLoading] = useState(true);
+  const [processingId, setProcessingId] = useState<string | null>(null);
+  const [notes, setNotes] = useState<{ [key: string]: string }>({});
+  const { toast } = useToast();
 
-function PaymentRow({ request, onDecide }: { request: PaymentRequest; onDecide: (id: string, decision: 'approved' | 'denied', notes: string) => Promise<void> }) {
-  const [notes, setNotes] = useState(''); const [busy, setBusy] = useState(false);
-  const choose = async (decision: 'approved' | 'denied') => { setBusy(true); await onDecide(request.id, decision, notes); setBusy(false); };
-  return <div className="rounded-xl border border-white/10 bg-black/20 p-5"><div className="flex flex-wrap justify-between gap-3"><div><p className="font-semibold">{request.email}</p><p className="text-xs text-slate-500">{new Date(request.created_at).toLocaleString()}</p></div><code className="rounded bg-white/5 px-2 py-1 text-sm text-violet-200">{request.proof}</code></div><Textarea value={notes} onChange={(e) => setNotes(e.target.value)} maxLength={2000} placeholder="Optional internal note" className="mt-4" /><div className="mt-4 flex gap-2"><Button disabled={busy} onClick={() => void choose('approved')} className="bg-emerald-600 hover:bg-emerald-500"><Check className="mr-2 h-4 w-4" />Approve</Button><Button disabled={busy} onClick={() => void choose('denied')} variant="outline" className="border-rose-300/20 text-rose-200"><X className="mr-2 h-4 w-4" />Deny</Button></div></div>;
+  const fetchPaymentRequests = useCallback(async () => {
+    setLoading(true);
+    try {
+      setRequests(await getPaymentRequests());
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to load payment requests',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
+
+  useEffect(() => {
+    void fetchPaymentRequests();
+  }, [fetchPaymentRequests]);
+
+  const handleReview = async (requestId: string, status: 'approved' | 'denied') => {
+    setProcessingId(requestId);
+
+    try {
+      const request = requests.find(r => r.id === requestId);
+      if (!request) return;
+
+      await reviewPayment(requestId, status, notes[requestId] || '');
+
+      toast({
+        title: status === 'approved' ? 'Payment Approved' : 'Payment Denied',
+        description: `Successfully ${status} payment request`,
+      });
+
+      // Remove from list
+      setRequests(current => current.filter(r => r.id !== requestId));
+    } catch (error) {
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'Failed to process payment request',
+        variant: 'destructive',
+      });
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  return (
+    <div className="container mx-auto px-4 py-8">
+      <Link to="/admin">
+        <Button variant="ghost" className="mb-4">
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Admin
+        </Button>
+      </Link>
+
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold mb-2">Review Payments</h1>
+          <p className="text-muted-foreground">
+            {requests.length > 0
+              ? `${requests.length} payment${requests.length > 1 ? 's' : ''} pending review`
+              : 'No pending payments'
+            }
+          </p>
+        </div>
+
+        {loading ? (
+          <div className="flex items-center justify-center py-16">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+          </div>
+        ) : requests.length === 0 ? (
+          <Card>
+            <CardContent className="py-16 text-center">
+              <div className="flex justify-center mb-4">
+                <div className="p-4 rounded-full bg-muted">
+                  <CheckCircle className="h-12 w-12 text-muted-foreground" />
+                </div>
+              </div>
+              <h3 className="text-xl font-semibold mb-2">All caught up!</h3>
+              <p className="text-muted-foreground">There are no pending payment requests</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="space-y-6">
+            {requests.map((request) => (
+              <Card key={request.id} className="border-2">
+                <CardHeader>
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <UserIcon className="h-5 w-5" />
+                        {request.email}
+                      </CardTitle>
+                      <CardDescription className="mt-1">
+                        Submitted on {formatDate(request.created_at)}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200">
+                      <Clock className="h-4 w-4" />
+                      <span className="text-sm font-medium">Pending</span>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid md:grid-cols-2 gap-4 p-4 bg-muted rounded-lg">
+                    <div>
+                      <Label className="text-muted-foreground">Payment Method</Label>
+                      <p className="font-medium capitalize">Gift Card</p>
+                    </div>
+                    <div>
+                      <Label className="text-muted-foreground">
+                        Gift Card Code
+                      </Label>
+                      <p className="font-mono text-sm break-all">
+                        {request.proof}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={`notes-${request.id}`}>Review Notes (Optional)</Label>
+                    <Input
+                      id={`notes-${request.id}`}
+                      placeholder="Add any notes about this review..."
+                      value={notes[request.id] || ''}
+                      onChange={(e) => setNotes({ ...notes, [request.id]: e.target.value })}
+                    />
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => handleReview(request.id, 'approved')}
+                      disabled={processingId !== null}
+                      className="flex-1 bg-green-600 hover:bg-green-700"
+                    >
+                      <CheckCircle className="h-4 w-4 mr-2" />
+                      {processingId === request.id ? 'Processing...' : 'Approve'}
+                    </Button>
+                    <Button
+                      onClick={() => handleReview(request.id, 'denied')}
+                      disabled={processingId !== null}
+                      variant="destructive"
+                      className="flex-1"
+                    >
+                      <XCircle className="h-4 w-4 mr-2" />
+                      {processingId === request.id ? 'Processing...' : 'Deny'}
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

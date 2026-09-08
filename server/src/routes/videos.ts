@@ -1,190 +1,77 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
-import { verifyToken, requireAdmin, AuthRequest } from '../middleware/auth.js';
+import { verifyToken, type AuthRequest } from '../middleware/auth.js';
+import { createSignedMediaUrl } from '../services/mediaSigning.js';
 
 const router = Router();
+const mediaBase = () => (process.env.MEDIA_PUBLIC_URL || 'https://media.candidfan.com').replace(/\/$/, '');
+const publicUrl = (kind: 'previews' | 'thumbnails', key: string | null) => key ? mediaBase() + '/media/' + kind + '/' + key.replace(/^\/+/, '').replace(new RegExp('^' + kind + '/'), '') : null;
+const publicFields = 'id,title,tags,status,duration_seconds,width,height,public_preview_key,public_thumbnail_key,created_at,published_at';
 
-// Get all videos with pagination (public)
+function present(video: Record<string, unknown>) {
+  return {
+    id: video.id,
+    title: video.title,
+    tags: video.tags || [],
+    duration_seconds: video.duration_seconds,
+    width: video.width,
+    height: video.height,
+    thumbnail_url: publicUrl('thumbnails', video.public_thumbnail_key as string | null),
+    preview_url: publicUrl('previews', video.public_preview_key as string | null),
+    created_at: video.created_at,
+    published_at: video.published_at,
+  };
+}
+
 router.get('/', async (req, res) => {
-  try {
-    const page = parseInt(req.query.page as string) || 1;
-    const limit = 20;
-    const offset = (page - 1) * limit;
-    const searchTag = req.query.tag as string;
-
-    let query = supabaseAdmin
-      .from('videos')
-      .select('*', { count: 'exact' })
-      .order('created_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-
-    if (searchTag) {
-      query = query.contains('tags', [searchTag]);
-    }
-
-    const { data, error, count } = await query;
-
-    if (error) throw error;
-
-    res.json({
-      videos: data,
-      pagination: {
-        page,
-        limit,
-        total: count || 0,
-        totalPages: Math.ceil((count || 0) / limit)
-      }
-    });
-  } catch (error) {
-    console.error('Get videos error:', error);
-    res.status(500).json({ error: 'Failed to fetch videos' });
+  const page = Math.max(1, Number.parseInt(String(req.query.page || '1'), 10) || 1);
+  const limit = Math.min(48, Math.max(1, Number.parseInt(String(req.query.limit || '24'), 10) || 24));
+  const tag = typeof req.query.tag === 'string' ? req.query.tag.trim() : '';
+  const query = supabaseAdmin
+    .from('videos')
+    .select(publicFields, { count: 'exact' })
+    .eq('status', 'published')
+    .order('published_at', { ascending: false })
+    .range((page - 1) * limit, page * limit - 1);
+  if (tag) query.contains('tags', [tag]);
+  const { data, error, count } = await query;
+  if (error) {
+    console.error('video listing failed', error);
+    return res.status(500).json({ error: 'Unable to load videos' });
   }
+  res.json({
+    videos: (data || []).map(present),
+    pagination: { page, limit, total: count || 0, totalPages: Math.max(1, Math.ceil((count || 0) / limit)) },
+  });
 });
 
-// Get single video by ID (public)
 router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const { data, error } = await supabaseAdmin
-      .from('videos')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error) throw error;
-
-    if (!data) {
-      return res.status(404).json({ error: 'Video not found' });
-    }
-
-    res.json(data);
-  } catch (error) {
-    console.error('Get video error:', error);
-    res.status(500).json({ error: 'Failed to fetch video' });
+  const { data, error } = await supabaseAdmin.from('videos').select(publicFields).eq('id', req.params.id).eq('status', 'published').maybeSingle();
+  if (error) {
+    console.error('video lookup failed', error);
+    return res.status(500).json({ error: 'Unable to load video' });
   }
+  if (!data) return res.status(404).json({ error: 'Video not found' });
+  res.json(present(data));
 });
 
-// Get download links for a video (requires premium or admin)
-router.get('/:id/downloads', verifyToken, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-
-    // Check user membership status
-    const { data: userData, error: userError } = await supabaseAdmin
-      .from('users')
-      .select('membership_status, is_admin')
-      .eq('id', req.user!.id)
-      .single();
-
-    if (userError) throw userError;
-
-    if (!userData.is_admin && userData.membership_status !== 'premium') {
-      return res.status(403).json({ 
-        error: 'Premium membership required to access download links' 
-      });
-    }
-
-    const { data, error } = await supabaseAdmin
-      .from('download_links')
-      .select('*')
-      .eq('video_id', id)
-      .order('order', { ascending: true });
-
-    if (error) throw error;
-
-    res.json(data);
-  } catch (error) {
-    console.error('Get download links error:', error);
-    res.status(500).json({ error: 'Failed to fetch download links' });
+router.post('/:id/playback', verifyToken, async (req: AuthRequest, res) => {
+  const user = req.user!;
+  if (!user.is_admin && user.membership_status !== 'premium') return res.status(403).json({ error: 'Premium membership required' });
+  const { data, error } = await supabaseAdmin
+    .from('videos')
+    .select('id,full_asset_key,duration_seconds,status')
+    .eq('id', req.params.id)
+    .eq('status', 'published')
+    .maybeSingle();
+  if (error) {
+    console.error('playback lookup failed', error);
+    return res.status(500).json({ error: 'Unable to authorize playback' });
   }
-});
-
-// Create new video (admin only)
-router.post('/', verifyToken, requireAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { title, thumbnail_url, tags, download_links } = req.body;
-
-    if (!title || !thumbnail_url) {
-      return res.status(400).json({ error: 'Title and thumbnail are required' });
-    }
-
-    // Insert video
-    const { data: video, error: videoError } = await supabaseAdmin
-      .from('videos')
-      .insert({
-        title,
-        thumbnail_url,
-        tags: tags || [],
-        created_by: req.user!.id
-      })
-      .select()
-      .single();
-
-    if (videoError) throw videoError;
-
-    // Insert download links if provided
-    if (download_links && download_links.length > 0) {
-      const linksToInsert = download_links.map((link: any, index: number) => ({
-        video_id: video.id,
-        label: link.label,
-        url: link.url,
-        order: index
-      }));
-
-      const { error: linksError } = await supabaseAdmin
-        .from('download_links')
-        .insert(linksToInsert);
-
-      if (linksError) throw linksError;
-    }
-
-    res.status(201).json(video);
-  } catch (error) {
-    console.error('Create video error:', error);
-    res.status(500).json({ error: 'Failed to create video' });
-  }
-});
-
-// Update video (admin only)
-router.put('/:id', verifyToken, requireAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-    const { title, thumbnail_url, tags } = req.body;
-
-    const { data, error } = await supabaseAdmin
-      .from('videos')
-      .update({ title, thumbnail_url, tags })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error) throw error;
-
-    res.json(data);
-  } catch (error) {
-    console.error('Update video error:', error);
-    res.status(500).json({ error: 'Failed to update video' });
-  }
-});
-
-// Delete video (admin only)
-router.delete('/:id', verifyToken, requireAdmin, async (req: AuthRequest, res) => {
-  try {
-    const { id } = req.params;
-
-    const { error } = await supabaseAdmin
-      .from('videos')
-      .delete()
-      .eq('id', id);
-
-    if (error) throw error;
-
-    res.json({ success: true });
-  } catch (error) {
-    console.error('Delete video error:', error);
-    res.status(500).json({ error: 'Failed to delete video' });
-  }
+  if (!data?.full_asset_key) return res.status(404).json({ error: 'Video media is unavailable' });
+  const signed = createSignedMediaUrl(data.full_asset_key, Number(data.duration_seconds || 0));
+  res.json({ url: signed.url, expires_at: signed.expiresAt, duration_seconds: data.duration_seconds, mime_type: 'video/mp4' });
 });
 
 export default router;
+

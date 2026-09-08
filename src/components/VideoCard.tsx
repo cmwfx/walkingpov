@@ -102,7 +102,7 @@ export function VideoCard({ video }: VideoCardProps) {
 
           {/* Quality Badge */}
           <div className="absolute top-4 left-4 px-3 py-1.5 rounded-lg bg-black/60 backdrop-blur-md border border-white/20 z-20">
-            <span className="text-xs font-semibold text-white">4K</span>
+            <span className="text-xs font-semibold text-white">720p</span>
           </div>
 
           {/* Bottom Content Overlay */}

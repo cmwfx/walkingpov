@@ -3,57 +3,57 @@ import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  throw new Error('Missing Supabase environment variables');
-}
+if (!supabaseUrl || !supabaseAnonKey) throw new Error('Missing Supabase browser configuration');
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
-  auth: {
-    autoRefreshToken: true,
-    persistSession: true,
-    detectSessionInUrl: true,
-  },
+  auth: { autoRefreshToken: true, persistSession: true, detectSessionInUrl: true },
 });
 
 export type User = {
   id: string;
   email: string;
-  membership_status: 'free' | 'pending' | 'premium' | 'denied';
-  payment_method?: 'crypto' | 'giftcard';
-  payment_proof?: string;
+  membership_status: 'free' | 'premium';
   is_admin: boolean;
-  created_at: string;
-  updated_at: string;
 };
 
 export type Video = {
   id: string;
   title: string;
-  thumbnail_url: string;
   tags: string[];
-  created_by: string;
+  duration_seconds: number;
+  width: number | null;
+  height: number | null;
+  thumbnail_url: string;
+  preview_url: string;
   created_at: string;
-  updated_at: string;
-};
-
-export type DownloadLink = {
-  id: string;
-  video_id: string;
-  label: string;
-  url: string;
-  order: number;
-  created_at: string;
+  published_at: string | null;
 };
 
 export type PaymentRequest = {
   id: string;
-  user_id: string;
-  payment_type: 'crypto' | 'giftcard';
-  proof: string;
+  amount_minor: number;
+  currency: string;
   status: 'pending' | 'approved' | 'denied';
-  reviewed_by?: string;
-  reviewed_at?: string;
-  notes?: string;
+  notes: string | null;
   created_at: string;
-  updated_at: string;
+  updated_at?: string;
+};
+
+export type SupportTicket = {
+  id: string;
+  owner_user_id: string;
+  subject: string;
+  status: 'open' | 'closed';
+  last_activity_at: string;
+  created_at: string;
+  user_last_read_at?: string | null;
+  admin_last_read_at?: string | null;
+};
+
+export type SupportMessage = {
+  id: string;
+  ticket_id: string;
+  author_user_id: string;
+  body: string;
+  created_at: string;
 };

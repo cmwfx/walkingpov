@@ -80,7 +80,7 @@ export function Signup() {
           </div>
           <CardTitle className="text-2xl text-center">Create your account</CardTitle>
           <CardDescription className="text-center">
-            Get lifetime premium access for just $30
+            Get lifetime premium access with one €50 payment
           </CardDescription>
         </CardHeader>
         <CardContent>

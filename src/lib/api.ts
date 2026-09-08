@@ -1,202 +1,58 @@
 import { API_URL } from './utils';
 import { supabase } from './supabase';
+import type { PaymentRequest, SupportMessage, SupportTicket, User, Video } from './supabase';
 
 let csrfToken: string | null = null;
 
-/**
- * Fetches CSRF token from the server
- */
-async function getCsrfToken(): Promise<string> {
-  if (csrfToken) {
-    return csrfToken;
-  }
-
-  try {
-    const response = await fetch(`${API_URL}/api/csrf-token`, {
-      credentials: 'include', // Important: include cookies
-    });
-
-    if (!response.ok) {
-      throw new Error('Failed to fetch CSRF token');
-    }
-
-    const data = await response.json();
-    const token = data.csrfToken || '';
-    csrfToken = token;
-    return token;
-  } catch (error) {
-    console.error('Error fetching CSRF token:', error);
-    throw error;
-  }
+async function getCsrfToken() {
+  if (csrfToken) return csrfToken;
+  const response = await fetch(API_URL + '/api/csrf-token', { credentials: 'include' });
+  if (!response.ok) throw new Error('Unable to initialize secure session');
+  csrfToken = (await response.json()).csrfToken;
+  return csrfToken as string;
 }
 
-export async function getAuthHeaders() {
-  const { data: { session } } = await supabase.auth.getSession();
-
-  if (!session?.access_token) {
-    throw new Error('Not authenticated');
+async function request<T>(path: string, init: RequestInit = {}, auth = false): Promise<T> {
+  const headers = new Headers(init.headers);
+  if (init.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  if (auth) {
+    const { data } = await supabase.auth.getSession();
+    if (!data.session?.access_token) throw new Error('Please sign in');
+    headers.set('Authorization', 'Bearer ' + data.session.access_token);
   }
-
-  const csrf = await getCsrfToken();
-
-  return {
-    'Authorization': `Bearer ${session.access_token}`,
-    'Content-Type': 'application/json',
-    'X-CSRF-Token': csrf,
-  };
+  if (init.method && init.method !== 'GET' && init.method !== 'HEAD') headers.set('X-CSRF-Token', await getCsrfToken());
+  const response = await fetch(API_URL + path, { ...init, headers, credentials: 'include' });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(payload.error || 'Request failed');
+  return payload as T;
 }
 
-export async function uploadThumbnail(file: File): Promise<string> {
-  const { data: { session } } = await supabase.auth.getSession();
+export async function getMe() { return request<{ user: User }>('/api/me', {}, true); }
+export async function getVideos(page = 1, tag = '') { return request<{ videos: Video[]; pagination: { page: number; total: number; totalPages: number } }>('/api/videos?page=' + page + (tag ? '&tag=' + encodeURIComponent(tag) : '')); }
+export async function getVideo(id: string) { return request<Video>('/api/videos/' + encodeURIComponent(id)); }
+export async function getPlaybackUrl(id: string) { return request<{ url: string; expires_at: string; duration_seconds: number; mime_type: string }>('/api/videos/' + encodeURIComponent(id) + '/playback', { method: 'POST', body: '{}' }, true); }
+export async function getOffer() { return request<{ amountMinor: number; currency: string; label: string; purchaseUrl: string }>('/api/payments/offer'); }
+export async function submitPayment(proof: string) { return request<{ id: string; status: string }>('/api/payments/submit', { method: 'POST', body: JSON.stringify({ proof }) }, true); }
+export async function getMyPayments() { return request<PaymentRequest[]>('/api/payments/mine', {}, true); }
+export async function getAdminStats() { return request<any>('/api/admin/stats', {}, true); }
+export async function getPaymentRequests() { return request<any[]>('/api/payments/admin/requests', {}, true); }
+export async function reviewPayment(id: string, decision: 'approved' | 'denied', notes: string) { return request<any>('/api/payments/admin/requests/' + id + '/review', { method: 'POST', body: JSON.stringify({ decision, notes }) }, true); }
+export async function getImportJobs() { return request<any[]>('/api/imports/admin/jobs', {}, true); }
+export async function startImportJob() { return request<any>('/api/imports/admin/jobs', { method: 'POST', body: '{}' }, true); }
+export async function updateImportJob(id: string, pause: boolean) { return request<any>('/api/imports/admin/jobs/' + id, { method: 'PATCH', body: JSON.stringify({ pause }) }, true); }
+export async function retryImportJob(id: string) { return request<any>('/api/imports/admin/jobs/' + id + '/retry', { method: 'POST', body: '{}' }, true); }
+export async function getTickets(admin = false) { return request<SupportTicket[]>('/api/support/' + (admin ? 'admin/' : '') + 'tickets', {}, true); }
+export async function createTicket(subject: string, body: string) { return request<any>('/api/support/tickets', { method: 'POST', body: JSON.stringify({ subject, body }) }, true); }
+export async function getTicket(id: string) { return request<SupportTicket & { messages: SupportMessage[] }>('/api/support/tickets/' + id, {}, true); }
+export async function replyToTicket(id: string, body: string, sendEmail = false) { return request<any>('/api/support/tickets/' + id + '/messages', { method: 'POST', body: JSON.stringify({ body, send_email: sendEmail }) }, true); }
+export async function updateTicket(id: string, status: 'open' | 'closed') { return request<any>('/api/support/tickets/' + id, { method: 'PATCH', body: JSON.stringify({ status }) }, true); }
 
-  if (!session?.access_token) {
-    throw new Error('Not authenticated');
-  }
+// Compatibility shims for unused legacy screens while the route migration is
+// completed; they do not expose downloads or JSON imports.
+export async function getDownloadLinks() { return []; }
+export async function uploadThumbnail() { throw new Error('Thumbnail uploads were replaced by the storage import worker'); }
+export async function createVideo() { throw new Error('Manual video creation was replaced by the storage import worker'); }
+export async function startBulkUpload() { throw new Error('JSON catalog imports are disabled for the fresh CandidFan catalog'); }
+export async function getBulkUploadStatus() { throw new Error('JSON catalog imports are disabled for the fresh CandidFan catalog'); }
+export type BulkUploadJobStatus = never;
 
-  const csrf = await getCsrfToken();
-  const formData = new FormData();
-  formData.append('thumbnail', file);
-
-  const response = await fetch(`${API_URL}/api/upload/thumbnail`, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${session.access_token}`,
-      'X-CSRF-Token': csrf,
-    },
-    credentials: 'include', // Important: include cookies
-    body: formData
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to upload thumbnail');
-  }
-
-  const data = await response.json();
-  return `${API_URL}${data.url}`;
-}
-
-export async function getVideos(page: number = 1, tag?: string) {
-  const url = new URL(`${API_URL}/api/videos`);
-  url.searchParams.set('page', page.toString());
-  if (tag) {
-    url.searchParams.set('tag', tag);
-  }
-
-  const response = await fetch(url.toString());
-  if (!response.ok) {
-    throw new Error('Failed to fetch videos');
-  }
-
-  return response.json();
-}
-
-export async function getVideo(id: string) {
-  const response = await fetch(`${API_URL}/api/videos/${id}`);
-  if (!response.ok) {
-    throw new Error('Failed to fetch video');
-  }
-
-  return response.json();
-}
-
-export async function getDownloadLinks(videoId: string) {
-  const headers = await getAuthHeaders();
-
-  const response = await fetch(`${API_URL}/api/videos/${videoId}/downloads`, {
-    headers
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to fetch download links');
-  }
-
-  return response.json();
-}
-
-export async function createVideo(data: {
-  title: string;
-  thumbnail_url: string;
-  tags: string[];
-  download_links: { label: string; url: string }[];
-}) {
-  const headers = await getAuthHeaders();
-
-  const response = await fetch(`${API_URL}/api/videos`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(data)
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to create video');
-  }
-
-  return response.json();
-}
-
-export async function bulkUploadFromJson(videos: any[]) {
-  const headers = await getAuthHeaders();
-
-  const response = await fetch(`${API_URL}/api/bulk-upload/json`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ videos })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to upload videos');
-  }
-
-  return response.json();
-}
-
-// Async bulk upload - Start job
-export async function startBulkUpload(videos: any[]): Promise<{ jobId: string }> {
-  const headers = await getAuthHeaders();
-
-  const response = await fetch(`${API_URL}/api/bulk-upload/json/start`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({ videos })
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to start bulk upload');
-  }
-
-  return response.json();
-}
-
-// Get bulk upload job status
-export interface BulkUploadJobStatus {
-  id: string;
-  totalVideos: number;
-  processed: number;
-  successful: number;
-  failed: number;
-  status: 'processing' | 'completed' | 'failed';
-  errors: Array<{
-    index: number;
-    title: string;
-    error: string;
-  }>;
-  startedAt: string;
-  completedAt?: string;
-}
-
-export async function getBulkUploadStatus(jobId: string): Promise<BulkUploadJobStatus> {
-  const headers = await getAuthHeaders();
-
-  const response = await fetch(`${API_URL}/api/bulk-upload/json/status/${jobId}`, {
-    headers
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json();
-    throw new Error(errorData.error || 'Failed to get upload status');
-  }
-
-  return response.json();
-}

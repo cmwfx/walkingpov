@@ -1,270 +1,41 @@
-import { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useParams } from 'react-router-dom';
+import { ArrowLeft, Crown, Lock, Play, Tag } from 'lucide-react';
+import { getPlaybackUrl, getVideo } from '@/lib/api';
+import type { Video } from '@/lib/supabase';
 import { useAuth } from '@/hooks/useAuth';
-import type { Video, DownloadLink } from '@/lib/supabase';
-import { getVideo, getDownloadLinks } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { useToast } from '@/components/ui/use-toast';
 import { PremiumBenefits } from '@/components/PremiumBenefits';
-import { DiscountTimer } from '@/components/DiscountTimer';
-import { Download, Lock, Tag, Calendar, Crown, ArrowLeft, Sparkles } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
-import { getResponsiveImageUrls, generateSrcSet, getPrimaryImageUrl } from '@/lib/imageUtils';
+import { formatDate, formatDuration } from '@/lib/utils';
 
 export function VideoDetail() {
   const { id } = useParams<{ id: string }>();
+  const { isAuthenticated, isPremium, isAdmin } = useAuth();
   const [video, setVideo] = useState<Video | null>(null);
-  const [downloadLinks, setDownloadLinks] = useState<DownloadLink[]>([]);
+  const [src, setSrc] = useState('');
+  const [expiresAt, setExpiresAt] = useState('');
+  const [ended, setEnded] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [linksLoading, setLinksLoading] = useState(false);
-  const [imageLoaded, setImageLoaded] = useState(false);
-  const { isPremium, isAdmin, isAuthenticated } = useAuth();
-  const { toast } = useToast();
-
-  const canAccessDownloads = isPremium || isAdmin;
-
+  const player = useRef<HTMLVideoElement>(null);
+  useEffect(() => { if (id) getVideo(id).then(setVideo).finally(() => setLoading(false)); }, [id]);
   useEffect(() => {
-    if (id) {
-      fetchVideo();
-      if (canAccessDownloads) {
-        fetchDownloadLinks();
-      }
-    }
-  }, [id, canAccessDownloads]);
-
-  const fetchVideo = async () => {
-    setLoading(true);
-    try {
-      const data = await getVideo(id!);
-      setVideo(data);
-    } catch (error) {
-      toast({
-        title: 'Error',
-        description: 'Failed to load video',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchDownloadLinks = async () => {
-    setLinksLoading(true);
-    try {
-      const data = await getDownloadLinks(id!);
-      setDownloadLinks(data);
-    } catch (error) {
-      console.error('Error fetching download links:', error);
-    } finally {
-      setLinksLoading(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!video) {
-    return (
-      <div className="container mx-auto px-4 py-16 text-center">
-        <h1 className="text-2xl font-bold mb-4">Video not found</h1>
-        <Link to="/">
-          <Button>Back to Home</Button>
-        </Link>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
-      <div className="container mx-auto px-4 py-8">
-        <Link to="/">
-          <Button variant="ghost" className="mb-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Browse
-          </Button>
-        </Link>
-
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            <Card>
-              <div className="aspect-video relative overflow-hidden bg-muted rounded-t-xl">
-                {/* Blur placeholder */}
-                {!imageLoaded && (
-                  <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-blue-900/40 animate-pulse" />
-                )}
-                
-                {/* Responsive thumbnail image */}
-                {(() => {
-                  const responsiveUrls = getResponsiveImageUrls(video.thumbnail_url);
-                  const primaryUrl = getPrimaryImageUrl(video.thumbnail_url);
-
-                  return responsiveUrls ? (
-                    <picture>
-                      <source
-                        type="image/avif"
-                        srcSet={generateSrcSet(responsiveUrls, 'avif')}
-                        sizes="(max-width: 1024px) 100vw, 66vw"
-                      />
-                      <source
-                        type="image/webp"
-                        srcSet={generateSrcSet(responsiveUrls, 'webp')}
-                        sizes="(max-width: 1024px) 100vw, 66vw"
-                      />
-                      <img
-                        src={primaryUrl}
-                        alt={video.title}
-                        className={`w-full h-full object-cover transition-opacity duration-500 ${
-                          imageLoaded ? 'opacity-100' : 'opacity-0'
-                        }`}
-                        onLoad={() => setImageLoaded(true)}
-                        onError={() => setImageLoaded(true)}
-                      />
-                    </picture>
-                  ) : (
-                    <img
-                      src={video.thumbnail_url}
-                      alt={video.title}
-                      className={`w-full h-full object-cover transition-opacity duration-500 ${
-                        imageLoaded ? 'opacity-100' : 'opacity-0'
-                      }`}
-                      onLoad={() => setImageLoaded(true)}
-                      onError={() => setImageLoaded(true)}
-                    />
-                  );
-                })()}
-              </div>
-              <CardHeader>
-                <CardTitle className="text-2xl md:text-3xl">{video.title}</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    <span>{formatDate(video.created_at)}</span>
-                  </div>
-                </div>
-
-                {video.tags && video.tags.length > 0 && (
-                  <div className="flex items-start gap-2">
-                    <Tag className="h-4 w-4 text-muted-foreground mt-1" />
-                    <div className="flex flex-wrap gap-2">
-                      {video.tags.map((tag, index) => (
-                        <span
-                          key={index}
-                          className="bg-primary/10 text-primary px-3 py-1 rounded-full text-sm"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Download Links Sidebar */}
-          <div className="lg:col-span-1">
-            <Card className="sticky top-4">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Download className="h-5 w-5" />
-                  Download Links
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                {canAccessDownloads ? (
-                  linksLoading ? (
-                    <div className="flex justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    </div>
-                  ) : downloadLinks.length > 0 ? (
-                    <div className="space-y-3">
-                      {downloadLinks.map((link) => (
-                        <a
-                          key={link.id}
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block"
-                        >
-                          <Button variant="outline" className="w-full justify-start">
-                            <Download className="h-4 w-4 mr-2" />
-                            {link.label}
-                          </Button>
-                        </a>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No download links available yet
-                    </p>
-                  )
-                ) : (
-                  <div className="py-4 space-y-6">
-                    <div className="text-center space-y-2">
-                      <div className="inline-flex items-center justify-center p-3 rounded-full bg-primary/10 mb-2 ring-1 ring-primary/20">
-                        <Lock className="h-6 w-6 text-primary" />
-                      </div>
-                      <h3 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400">
-                        Premium Content
-                      </h3>
-                    </div>
-
-                    <PremiumBenefits />
-
-                    {isAuthenticated ? (
-                      <Link to="/dashboard">
-                        <Button className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all shadow-lg shadow-primary/25 animate-pulse">
-                          <Crown className="h-4 w-4 mr-2" />
-                          Upgrade Now
-                        </Button>
-                      </Link>
-                    ) : (
-                      <div className="space-y-3">
-                        <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 mb-2 backdrop-blur-sm">
-                          <div className="flex items-center justify-center gap-2 mb-2">
-                            <Sparkles className="h-4 w-4 text-yellow-500" />
-                            <span className="font-bold text-sm">Celebrating 10k Members!</span>
-                          </div>
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Special Offer Ends In</span>
-                            <DiscountTimer />
-                          </div>
-                        </div>
-                        <Link to="/signup">
-                          <Button className="w-full h-auto py-4 flex-col gap-1 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all shadow-lg shadow-primary/25 hover:scale-[1.02]">
-                            <div className="flex items-center gap-2 font-bold text-lg">
-                              <Crown className="h-5 w-5" />
-                              Get Lifetime Access - $30
-                            </div>
-                            <div className="flex items-center gap-2 text-xs opacity-90">
-                              <span className="line-through opacity-70">$120</span>
-                              <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] font-bold">75% OFF</span>
-                            </div>
-                          </Button>
-                        </Link>
-                        <Link to="/login">
-                          <Button variant="ghost" className="w-full text-muted-foreground hover:text-foreground text-sm">
-                            Already a member? Login
-                          </Button>
-                        </Link>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      </div>
+    if (!src || !expiresAt || !id) return;
+    const wait = Math.max(10_000, new Date(expiresAt).getTime() - Date.now() - 60_000);
+    const timer = window.setTimeout(async () => {
+      const position = player.current?.currentTime || 0; const playing = player.current ? !player.current.paused : false;
+      try { const next = await getPlaybackUrl(id); setSrc(next.url); setExpiresAt(next.expires_at); window.setTimeout(() => { if (player.current) { player.current.currentTime = position; if (playing) void player.current.play(); } }, 50); } catch { setSrc(''); }
+    }, wait);
+    return () => window.clearTimeout(timer);
+  }, [src, expiresAt, id]);
+  if (loading) return <div className="container mx-auto py-24 text-center text-slate-400">Loading video…</div>;
+  if (!video) return <div className="container mx-auto py-24 text-center"><p className="text-white">Video not found.</p><Link to="/"><Button className="mt-4">Back to library</Button></Link></div>;
+  const premium = isPremium || isAdmin;
+  return <div className="container mx-auto max-w-5xl px-4 py-8">
+    <Link to="/" className="inline-flex items-center text-sm text-slate-400 hover:text-white"><ArrowLeft className="mr-2 h-4 w-4" />Back to library</Link>
+    <div className="mt-6 grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
+      <div><div className="overflow-hidden rounded-2xl border border-white/10 bg-black shadow-2xl"><video ref={player} className="aspect-video w-full" controls playsInline preload="metadata" poster={video.thumbnail_url || undefined} src={src || video.preview_url || undefined} onEnded={() => setEnded(true)}><track kind="captions" /></video></div><div className="mt-6"><h1 className="text-3xl font-bold text-white">{video.title}</h1><div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-slate-400"><span>{formatDuration(video.duration_seconds)}</span><span>•</span><span>{formatDate(video.created_at)}</span>{video.width && video.height && <><span>•</span><span>720p-ready</span></>}</div>{video.tags.length > 0 && <div className="mt-4 flex flex-wrap gap-2">{video.tags.map((tag) => <span key={tag} className="inline-flex items-center gap-1 rounded-full border border-violet-400/20 bg-violet-400/10 px-3 py-1 text-xs text-violet-200"><Tag className="h-3 w-3" />{tag}</span>)}</div>}</div></div>
+      <Card className="h-fit border-white/10 bg-white/5"><CardHeader><CardTitle className="flex items-center gap-2 text-white">{premium ? <Crown className="h-5 w-5 text-amber-300" /> : <Lock className="h-5 w-5 text-violet-300" />}{premium ? 'Full playback' : 'Five-second preview'}</CardTitle></CardHeader><CardContent className="space-y-5">{premium ? <><p className="text-sm text-slate-300">Your expiring playback link refreshes automatically while you watch.</p><Button className="w-full" onClick={async () => { const data = await getPlaybackUrl(video.id); setSrc(data.url); setExpiresAt(data.expires_at); setEnded(false); }}><Play className="mr-2 h-4 w-4" />{src ? 'Refresh playback' : 'Start full video'}</Button>{src && <p className="text-xs text-slate-500">Downloads are not offered; playback stays inside the secure player.</p>}</> : <><p className="text-sm text-slate-300">This preview is limited at the media server. Upgrade once for lifetime access to the full library.</p><PremiumBenefits />{ended && <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 p-3 text-sm text-amber-100">Preview finished. Unlock the full video to keep watching.</p>}<Link to={isAuthenticated ? '/payment' : '/signup'}><Button className="w-full bg-gradient-to-r from-violet-600 to-sky-600"><Crown className="mr-2 h-4 w-4" />Unlock for €50</Button></Link>{!isAuthenticated && <Link to="/login" className="block text-center text-sm text-slate-400 hover:text-white">Already a member? Sign in</Link>}</>}</CardContent></Card>
     </div>
-  );
+  </div>;
 }

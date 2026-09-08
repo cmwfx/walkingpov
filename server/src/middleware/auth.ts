@@ -1,75 +1,41 @@
-import { Request, Response, NextFunction } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email?: string;
-    is_admin?: boolean;
-  };
+export interface AuthUser {
+  id: string;
+  email: string;
+  membership_status: 'free' | 'premium';
+  is_admin: boolean;
 }
 
-export const verifyToken = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
+export interface AuthRequest extends Request {
+  user?: AuthUser;
+}
+
+export async function verifyToken(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const authHeader = req.headers.authorization;
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('❌ No auth header or invalid format');
-      return res.status(401).json({ error: 'No authorization token provided' });
-    }
-
-    const token = authHeader.substring(7);
-    console.log('🔑 Verifying token...');
-
-    // Verify the JWT token
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
-
-    if (error || !user) {
-      console.log('❌ Token verification failed:', error?.message || 'No user');
-      return res.status(401).json({ error: 'Invalid or expired token' });
-    }
-
-    console.log('✅ Token verified for user:', user.id);
-
-    // Get user details from our users table
-    const { data: userData, error: userError } = await supabaseAdmin
+    const header = req.headers.authorization;
+    if (!header?.startsWith('Bearer ')) return res.status(401).json({ error: 'Authentication required' });
+    const token = header.slice(7);
+    const { data: authData, error: authError } = await supabaseAdmin.auth.getUser(token);
+    if (authError || !authData.user) return res.status(401).json({ error: 'Invalid or expired session' });
+    const { data, error } = await supabaseAdmin
       .from('users')
-      .select('id, email, is_admin')
-      .eq('id', user.id)
-      .single();
-
-    if (userError || !userData) {
-      console.log('❌ User lookup failed:', userError?.message || 'No user data');
-      console.log('User error details:', userError);
-      return res.status(401).json({ error: 'User not found' });
-    }
-
-    console.log('✅ User found:', userData.email, 'Admin:', userData.is_admin);
-
-    req.user = userData;
+      .select('id,email,membership_status,is_admin')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+    if (error || !data) return res.status(401).json({ error: 'User profile not found' });
+    req.user = data as AuthUser;
     next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
-    return res.status(500).json({ error: 'Authentication failed' });
+    console.error('auth verification failed', error);
+    res.status(401).json({ error: 'Authentication failed' });
   }
-};
+}
 
-export const requireAdmin = async (
-  req: AuthRequest,
-  res: Response,
-  next: NextFunction
-) => {
-  if (!req.user) {
-    return res.status(401).json({ error: 'Authentication required' });
-  }
-
-  if (!req.user.is_admin) {
-    return res.status(403).json({ error: 'Admin access required' });
-  }
-
+export function requireAdmin(req: AuthRequest, res: Response, next: NextFunction) {
+  if (!req.user) return res.status(401).json({ error: 'Authentication required' });
+  if (!req.user.is_admin) return res.status(403).json({ error: 'Admin access required' });
   next();
-};
+}
+

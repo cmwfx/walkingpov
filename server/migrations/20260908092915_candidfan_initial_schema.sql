@@ -1,0 +1,4 @@
+-- Applied to the fresh Supabase project as candidfan_initial_schema.
+-- The complete first migration is kept in ../../supabase-schema.sql so the
+-- repository has one reviewable copy of the authoritative schema.
+-- Keep this marker in the backend migration directory for release tooling.

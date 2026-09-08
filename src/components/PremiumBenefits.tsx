@@ -9,26 +9,26 @@ export function PremiumBenefits({ className }: { className?: string }) {
     },
     {
       icon: Video,
-      us: "Thousands of videos",
-      others: "Limited content",
+      us: "Full 720p streaming library",
+      others: "Five-second previews",
       highlight: true
     },
     {
       icon: Crown,
-      us: "$50k+ worth of content",
-      others: "$20 per video",
+      us: "One €50 lifetime payment",
+      others: "Recurring subscriptions",
       highlight: true
     },
     {
       icon: Zap,
-      us: "Request any video",
-      others: "Multiple subscriptions",
+      us: "Secure playback links",
+      others: "Unprotected file links",
       highlight: true
     },
     {
       icon: Shield,
-      us: "No personal info collected",
-      others: "Non-discrete payments",
+      us: "Encrypted payment proof",
+      others: "Plain-text payment storage",
       highlight: true
     }
   ];

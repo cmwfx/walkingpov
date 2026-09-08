@@ -1,273 +1,30 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { PremiumBenefits } from '@/components/PremiumBenefits';
-import { DiscountTimer } from '@/components/DiscountTimer';
+import { useEffect, useState } from 'react';
+import { ExternalLink, Gift, ShieldCheck } from 'lucide-react';
+import { getMyPayments, getOffer, submitPayment } from '@/lib/api';
+import { GIFT_CARD_LINK } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { CRYPTO_ADDRESSES, GIFT_CARD_LINK, CONTACT_INFO, API_URL } from '@/lib/utils';
-import { getAuthHeaders } from '@/lib/api';
-import { Copy, ExternalLink, Wallet, CreditCard, CheckCircle, Sparkles } from 'lucide-react';
+import type { PaymentRequest } from '@/lib/supabase';
 
 export function PaymentSubmit() {
-  const [paymentType, setPaymentType] = useState<'crypto' | 'giftcard'>('giftcard');
   const [proof, setProof] = useState('');
+  const [requests, setRequests] = useState<PaymentRequest[]>([]);
+  const [offer, setOffer] = useState<{ label: string; purchaseUrl: string }>({ label: '€50', purchaseUrl: GIFT_CARD_LINK });
   const [loading, setLoading] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
-  const { user, refreshUser } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
-
-  const copyToClipboard = (text: string, label: string) => {
-    navigator.clipboard.writeText(text);
-    toast({
-      title: 'Copied!',
-      description: `${label} address copied to clipboard`,
-    });
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
-    try {
-      const headers = await getAuthHeaders();
-      const response = await fetch(`${API_URL}/api/payments/submit`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          payment_type: paymentType,
-          proof: proof.trim(),
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Failed to submit payment');
-      }
-
-      refreshUser();
-      setSubmitted(true);
-
-      toast({
-        title: 'Payment submitted!',
-        description: 'Your payment is under review. We will contact you soon.',
-      });
-
-    } catch (err: any) {
-      console.error('Payment submission error:', err);
-      toast({
-        title: 'Error',
-        description: err.message || 'Failed to submit payment. Please try again.',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  if (user?.membership_status === 'pending' || submitted) {
-    return (
-      <div className="container mx-auto px-4 py-16">
-        <Card className="max-w-2xl mx-auto">
-          <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="p-4 rounded-full bg-yellow-100 dark:bg-yellow-900">
-                <CheckCircle className="h-12 w-12 text-yellow-600" />
-              </div>
-            </div>
-            <CardTitle className="text-2xl">Payment Under Review</CardTitle>
-            <CardDescription>
-              Thank you for your submission! Your payment is being verified.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg space-y-2">
-              <h3 className="font-semibold">Contact Information:</h3>
-              <div className="space-y-1 text-sm">
-                <p>
-                  <span className="font-medium">Telegram:</span>{' '}
-                  <a href={`https://t.me/${CONTACT_INFO.telegram.replace('@', '')}`} 
-                     className="text-primary hover:underline" 
-                     target="_blank" 
-                     rel="noopener noreferrer">
-                    {CONTACT_INFO.telegram}
-                  </a>
-                </p>
-                <p>
-                  <span className="font-medium">Email:</span>{' '}
-                  <a href={`mailto:${CONTACT_INFO.email}`} className="text-primary hover:underline">
-                    {CONTACT_INFO.email}
-                  </a>
-                </p>
-                <p>
-                  <span className="font-medium">Review Time:</span> {CONTACT_INFO.reviewTime}
-                </p>
-              </div>
-            </div>
-            <Button onClick={() => navigate('/dashboard')} className="w-full">
-              Go to Dashboard
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  return (
-    <div className="container mx-auto px-4 py-16">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-3 rounded-xl bg-primary/10 mb-6 border border-primary/20 backdrop-blur-sm animate-pulse">
-            <div className="flex items-center gap-2 mr-3">
-              <Sparkles className="h-5 w-5 text-yellow-500" />
-              <span className="font-bold text-base bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">Celebrating 10k Members!</span>
-            </div>
-            <div className="flex items-center gap-2 border-l border-primary/20 pl-3">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Offer Ends In</span>
-              <DiscountTimer />
-            </div>
-          </div>
-          
-          <h1 className="text-4xl font-bold mb-2">Lifetime Premium Access</h1>
-          <p className="text-xl text-muted-foreground mb-8">One-time payment of $30</p>
-          
-          <div className="max-w-xl mx-auto text-left mb-12">
-            <PremiumBenefits className="bg-muted/30 p-6 rounded-xl border" />
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <Card 
-            className={`cursor-pointer transition-all ${
-              paymentType === 'giftcard' ? 'ring-2 ring-primary' : ''
-            }`}
-            onClick={() => setPaymentType('giftcard')}
-          >
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                <CardTitle>REWARBLE VISA Gift Card</CardTitle>
-              </div>
-              <CardDescription>Pay with Paypal, Visa, Mastercard etc</CardDescription>
-            </CardHeader>
-          </Card>
-
-          <Card 
-            className={`cursor-pointer transition-all ${
-              paymentType === 'crypto' ? 'ring-2 ring-primary' : ''
-            }`}
-            onClick={() => setPaymentType('crypto')}
-          >
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <Wallet className="h-5 w-5" />
-                <CardTitle>Cryptocurrency</CardTitle>
-              </div>
-              <CardDescription>Pay with BTC, LTC, or USDT</CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-
-        {paymentType === 'giftcard' ? (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>REWARBLE VISA Gift Card Payment</CardTitle>
-              <CardDescription>
-                Purchase a $30 REWARBLE VISA gift card from the link below and submit the gift card code
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <a
-                href={GIFT_CARD_LINK}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 p-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-              >
-                <CreditCard className="h-5 w-5" />
-                Purchase REWARBLE VISA Gift Card
-                <ExternalLink className="h-4 w-4" />
-              </a>
-            </CardContent>
-          </Card>
-        ) : (
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle>Cryptocurrency Addresses</CardTitle>
-              <CardDescription>
-                Send $30 worth of crypto to one of these addresses
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {Object.entries(CRYPTO_ADDRESSES).map(([currency, { address, network }]) => (
-                <div key={currency} className="flex items-center justify-between p-3 bg-muted rounded-lg">
-                  <div className="flex-1">
-                    <div className="font-semibold">{currency}</div>
-                    <div className="text-xs text-muted-foreground mb-1">
-                      Network: {network}
-                    </div>
-                    <div className="text-sm text-muted-foreground font-mono break-all">
-                      {address}
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => copyToClipboard(address, currency)}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              ))}
-            </CardContent>
-          </Card>
-        )}
-
-        <Card>
-          <CardHeader>
-            <CardTitle>Submit Payment Proof</CardTitle>
-            <CardDescription>
-              {paymentType === 'giftcard'
-                ? 'Enter your REWARBLE VISA gift card code'
-                : 'Enter your transaction ID or hash'
-              }
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="proof">
-                  {paymentType === 'giftcard' ? 'REWARBLE VISA Gift Card Code' : 'Transaction ID'}
-                </Label>
-                <Input
-                  id="proof"
-                  placeholder={
-                    paymentType === 'giftcard'
-                      ? 'Enter REWARBLE VISA gift card code'
-                      : 'Enter transaction hash/ID'
-                  }
-                  value={proof}
-                  onChange={(e) => setProof(e.target.value)}
-                  maxLength={500}
-                  required
-                />
-                <div className="flex justify-between items-center text-xs text-muted-foreground">
-                  <span>Maximum 500 characters</span>
-                  <span className={proof.length > 450 ? 'text-yellow-600' : ''}>
-                    {proof.length}/500
-                  </span>
-                </div>
-              </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Submitting...' : 'Submit Payment'}
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
-      </div>
-    </div>
-  );
+  useEffect(() => { void Promise.all([getMyPayments(), getOffer()]).then(([history, nextOffer]) => { setRequests(history); setOffer(nextOffer); }); }, []);
+  const pending = requests.some((request) => request.status === 'pending');
+  return <div className="container mx-auto max-w-3xl px-4 py-10"><Card className="border-white/10 bg-white/5"><CardHeader><CardTitle className="flex items-center gap-2 text-white"><Gift className="h-5 w-5 text-violet-300" />Unlock lifetime access for {offer.label}</CardTitle><CardDescription>Purchase the supplied Rewarble Visa gift card, then send its proof for manual review.</CardDescription></CardHeader><CardContent className="space-y-6">
+    <div className="rounded-xl border border-violet-400/20 bg-violet-400/10 p-5"><p className="text-sm text-slate-200">1. Buy the €50 card using the official purchase link.</p><a className="mt-3 inline-flex items-center text-sm text-violet-200 underline" href={offer.purchaseUrl} target="_blank" rel="noreferrer">Open purchase link <ExternalLink className="ml-2 h-4 w-4" /></a><p className="mt-4 text-sm text-slate-200">2. Paste the gift-card code or proof below. It is encrypted before storage and only decrypted for admin review.</p></div>
+    <form className="space-y-4" onSubmit={async (event) => { event.preventDefault(); setLoading(true); try { await submitPayment(proof); setProof(''); setRequests(await getMyPayments()); toast({ title: 'Proof submitted', description: 'Your request is queued for review.' }); } catch (error) { toast({ title: 'Unable to submit', description: error instanceof Error ? error.message : 'Please try again', variant: 'destructive' }); } finally { setLoading(false); } }}>
+      <div className="space-y-2"><Label htmlFor="proof">Gift-card proof</Label><Input id="proof" value={proof} onChange={(event) => setProof(event.target.value)} maxLength={500} required disabled={pending} placeholder="Enter the code or proof provided by Rewarble" /></div>
+      <Button type="submit" disabled={loading || pending}>{pending ? 'Already pending review' : loading ? 'Submitting securely…' : 'Submit for review'}</Button>
+    </form>
+    {requests.length > 0 && <div className="space-y-3"><h2 className="font-semibold text-white">Recent submissions</h2>{requests.map((request) => <div key={request.id} className="flex items-center justify-between rounded-lg border border-white/10 p-3 text-sm"><span className="text-slate-300">{new Date(request.created_at).toLocaleString()}</span><span className="capitalize text-violet-200">{request.status}</span></div>)}</div>}
+    <p className="flex items-start gap-2 text-xs text-slate-500"><ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />CandidFan never accepts crypto payments. The outgoing hello@candidfan.com address is not monitored; use support tickets after signing in.</p>
+  </CardContent></Card></div>;
 }
+

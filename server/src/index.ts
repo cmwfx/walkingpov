@@ -1,142 +1,86 @@
+import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import compression from 'compression';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
-import dotenv from 'dotenv';
-import path from 'path';
-import { fileURLToPath } from 'url';
 import { apiLimiter } from './middleware/rateLimiter.js';
 import { generateCsrfToken, verifyCsrfToken } from './middleware/csrf.js';
-import uploadRoutes from './routes/upload.js';
-import videoRoutes from './routes/videos.js';
-import bulkUploadRoutes from './routes/bulk-upload.js';
-import paymentRoutes from './routes/payments.js';
-
-dotenv.config();
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+import { verifyToken, requireAdmin, type AuthRequest } from './middleware/auth.js';
+import { supabaseAdmin } from './config/supabase.js';
+import videos from './routes/videos.js';
+import payments from './routes/payments.js';
+import support from './routes/support.js';
+import imports from './routes/imports.js';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+const port = Number(process.env.PORT || 3001);
+const host = process.env.HOST || '127.0.0.1';
+const frontendUrl = (process.env.FRONTEND_URL || 'https://candidfan.com').replace(/\/$/, '');
+const supabaseUrl = process.env.SUPABASE_URL || '';
+const mediaUrl = (process.env.MEDIA_PUBLIC_URL || 'https://media.candidfan.com').replace(/\/$/, '');
 
-// Security headers with helmet
+app.set('trust proxy', 1);
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      styleSrc: ["'self'", "'unsafe-inline'"],
-      scriptSrc: ["'self'"],
-      imgSrc: ["'self'", 'data:', 'https:'],
-      connectSrc: ["'self'"],
-      fontSrc: ["'self'"],
+      baseUri: ["'none'"],
+      frameAncestors: ["'none'"],
       objectSrc: ["'none'"],
-      mediaSrc: ["'self'"],
-      frameSrc: ["'none'"],
+      scriptSrc: ["'self'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', mediaUrl],
+      mediaSrc: ["'self'", mediaUrl],
+      connectSrc: ["'self'", supabaseUrl, mediaUrl],
+      fontSrc: ["'self'", 'data:'],
     },
   },
-  hsts: {
-    maxAge: 31536000, // 1 year
-    includeSubDomains: true,
-    preload: true,
-  },
-  frameguard: {
-    action: 'deny',
-  },
-  referrerPolicy: {
-    policy: 'strict-origin-when-cross-origin',
-  },
+  hsts: { maxAge: 31536000, includeSubDomains: true },
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' },
 }));
-
-// Middleware
-app.use(cors({
-  origin: FRONTEND_URL,
-  credentials: true
-}));
-
-// Enable GZIP/Brotli compression
-app.use(compression({
-  filter: (req, res) => {
-    if (req.headers['x-no-compression']) {
-      return false;
-    }
-    return compression.filter(req, res);
-  },
-  level: 6
-}));
-
-// Trust proxy (Nginx) for correct protocol/IP
-app.set('trust proxy', 1);
-
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(cors({ origin: frontendUrl, credentials: true }));
+app.use(compression());
+app.use(express.json({ limit: '2mb' }));
+app.use(express.urlencoded({ extended: false, limit: '2mb' }));
 app.use(cookieParser());
 
-// Apply rate limiting to all API routes
+app.get('/api/csrf-token', generateCsrfToken, (req, res) => res.json({ csrfToken: (req as RequestWithCsrf).csrfToken?.() || '' }));
 app.use('/api', apiLimiter);
-
-// Endpoint to get CSRF token
-app.get('/api/csrf-token', generateCsrfToken, (req, res) => {
-  res.json({ csrfToken: (req as any).csrfToken() });
-});
-
-// Apply CSRF protection to all state-changing API routes
 app.use('/api', verifyCsrfToken);
 
-// Serve uploaded files statically with caching
-const uploadDir = process.env.UPLOAD_DIR || './uploads';
-app.use('/uploads', express.static(path.resolve(uploadDir), {
-  maxAge: '1y', // Cache for 1 year
-  immutable: true,
-  setHeaders: (res, filePath) => {
-    // Set cache control headers
-    res.set('Cache-Control', 'public, max-age=31536000, immutable');
-    res.set('Vary', 'Accept-Encoding');
+app.get('/health', (_req, res) => res.json({ status: 'ok', service: 'candidfan-api', timestamp: new Date().toISOString() }));
+app.get('/api/health', (_req, res) => res.json({ status: 'ok', service: 'candidfan-api', timestamp: new Date().toISOString() }));
+app.get('/api/me', verifyToken, (req: AuthRequest, res) => res.json({ user: req.user }));
+app.get('/api/admin/stats', verifyToken, requireAdmin, async (_req: AuthRequest, res) => {
+  try {
+    const [videosResult, usersResult, paymentsResult, ticketsResult, jobsResult] = await Promise.all([
+      supabaseAdmin.from('videos').select('id', { count: 'exact', head: true }).eq('status', 'published'),
+      supabaseAdmin.from('users').select('id', { count: 'exact', head: true }),
+      supabaseAdmin.from('payment_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+      supabaseAdmin.from('support_tickets').select('id', { count: 'exact', head: true }).eq('status', 'open'),
+      supabaseAdmin.from('import_jobs').select('id,status,discovered_count,processing_count,published_count,duplicate_count,failed_count').order('created_at', { ascending: false }).limit(1).maybeSingle(),
+    ]);
+    res.json({ published_videos: videosResult.count || 0, users: usersResult.count || 0, pending_payments: paymentsResult.count || 0, open_tickets: ticketsResult.count || 0, import_job: jobsResult.data || null });
+  } catch (error) {
+    console.error('admin stats failed', error);
+    res.status(500).json({ error: 'Unable to load admin stats' });
   }
-}));
-
-// Routes
-app.use('/api/upload', uploadRoutes);
-app.use('/api/videos', videoRoutes);
-app.use('/api/bulk-upload', bulkUploadRoutes);
-app.use('/api/payments', paymentRoutes);
-
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// 404 handler
-app.use((req, res) => {
-  res.status(404).json({ error: 'Route not found' });
+app.use('/api/videos', videos);
+app.use('/api/payments', payments);
+app.use('/api/support', support);
+app.use('/api', imports);
+
+app.use((_req, res) => res.status(404).json({ error: 'Route not found' }));
+app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
+  console.error('unhandled API error', error);
+  res.status(500).json({ error: 'Internal server error' });
 });
 
-// Error handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  // Log full error details server-side
-  console.error('Server error:', {
-    message: err.message,
-    stack: err.stack,
-    url: req.url,
-    method: req.method,
-    timestamp: new Date().toISOString(),
-  });
+interface RequestWithCsrf extends express.Request { csrfToken?: () => string }
 
-  // In production, return generic error messages to prevent information disclosure
-  const isProduction = process.env.NODE_ENV === 'production';
-
-  res.status(err.status || 500).json({
-    error: isProduction
-      ? 'An error occurred. Please try again later.'
-      : err.message || 'Internal server error',
-    ...(isProduction ? {} : { stack: err.stack }), // Include stack trace only in development
-  });
-});
-
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
-  console.log(`📁 Upload directory: ${path.resolve(uploadDir)}`);
-  console.log(`🌐 CORS enabled for: ${FRONTEND_URL}`);
+app.listen(port, host, () => {
+  console.log('CandidFan API listening on ' + host + ':' + port);
 });

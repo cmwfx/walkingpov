@@ -3,6 +3,7 @@ import { NextFunction, Request, Response } from 'express';
 
 const COOKIE = 'candidfan_csrf';
 const HEADER = 'x-csrf-token';
+const importerToken = process.env.IMPORTER_TOKEN || '';
 
 export function generateCsrfToken(req: Request, res: Response, next: NextFunction) {
   const token = crypto.randomBytes(32).toString('hex');
@@ -18,6 +19,7 @@ export function generateCsrfToken(req: Request, res: Response, next: NextFunctio
 
 export function verifyCsrfToken(req: Request, res: Response, next: NextFunction) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
+  if (req.path.startsWith('/import/') && importerToken && req.headers.authorization === `Bearer ${importerToken}`) return next();
   const cookieToken = req.cookies?.[COOKIE] as string | undefined;
   const headerToken = req.headers[HEADER] as string | undefined;
   if (!cookieToken || !headerToken || cookieToken.length !== headerToken.length ||

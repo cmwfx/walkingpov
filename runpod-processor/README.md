@@ -6,7 +6,7 @@ The runner detects the available vCPUs with Node's `availableParallelism()`. By 
 
 ## When a pod is rented
 
-1. Generate an SSH key pair for the pod-to-storage SFTP connection. Keep the private key only on the temporary pod.
+1. Generate a separate RSA PEM SSH key pair for the pod-to-storage SFTP connection (`ssh-keygen -t rsa -b 4096 -m PEM`). Keep the private key only on the temporary pod. The RunPod Ed25519 key used to administer the pod is separate.
 2. Run `setup-remote-processor-access.sh` on the storage VPS with the public key in `PROCESSOR_SSH_PUBLIC_KEY`. This creates a restricted SFTP-only account with read access to the private inbox and write access to the CandidFan media root.
 3. Prepare `/etc/candidfan/runpod-processor.env` on the pod using `.env.example`. Set `WORKER_TOKEN`, the storage host, and the private key path.
 4. Run `bootstrap.sh` with `CANDIDFAN_REPO_URL=https://github.com/cmwfx/walkingpov.git`. It installs FFmpeg/Node, installs this package, and starts the runner.

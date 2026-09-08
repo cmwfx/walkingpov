@@ -6,6 +6,7 @@ import { supabaseAdmin } from '../config/supabase.js';
 const router = Router();
 const importerToken = process.env.IMPORTER_TOKEN || '';
 const internalSource = process.env.IMPORT_SOURCE_KIND || 'originals';
+const mediaBaseUrl = (process.env.MEDIA_BASE_URL || 'https://media.candidfan.com').replace(/\/$/, '');
 
 function isUuid(value: unknown): value is string {
   return typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
@@ -97,6 +98,37 @@ router.post('/items/claim', internalAuth, async (req, res) => {
     return res.status(500).json({ error: 'import_item_claim_failed' });
   }
   return res.json({ item_id: data[0].item_id, status: data[0].item_status, storage_key: data[0].claimed_storage_key, thumbnail_key: data[0].claimed_thumbnail_key });
+});
+
+router.post('/items/thumbnail', internalAuth, async (req, res) => {
+  const sourceIdentity = typeof req.body?.source_identity === 'string' ? req.body.source_identity : '';
+  const thumbnailUrl = typeof req.body?.thumbnail_url === 'string' ? req.body.thumbnail_url : '';
+  if (!/^[a-f0-9]{64}$/.test(sourceIdentity)) return res.status(400).json({ error: 'invalid_source_identity' });
+
+  let parsedThumbnail: URL;
+  try {
+    parsedThumbnail = new URL(thumbnailUrl);
+  } catch {
+    return res.status(400).json({ error: 'invalid_thumbnail_url' });
+  }
+  if (parsedThumbnail.origin !== new URL(mediaBaseUrl).origin || !parsedThumbnail.pathname.startsWith('/thumb/')) {
+    return res.status(400).json({ error: 'invalid_thumbnail_url' });
+  }
+
+  const { data: item, error: itemError } = await supabaseAdmin
+    .from('import_items')
+    .select('video_id')
+    .eq('source_identity', sourceIdentity)
+    .maybeSingle();
+  if (itemError) return res.status(500).json({ error: 'import_item_lookup_failed' });
+  if (!item?.video_id) return res.status(404).json({ error: 'import_item_not_found' });
+
+  const { error: updateError } = await supabaseAdmin
+    .from('videos')
+    .update({ thumbnail_url: parsedThumbnail.toString() })
+    .eq('id', item.video_id);
+  if (updateError) return res.status(500).json({ error: 'thumbnail_update_failed' });
+  return res.json({ ok: true });
 });
 
 router.post('/items/:id/publish', internalAuth, async (req, res) => {

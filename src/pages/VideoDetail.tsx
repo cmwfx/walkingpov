@@ -254,7 +254,7 @@ export function VideoDetail() {
                               Get Lifetime Access - €50
                             </div>
                             <div className="flex items-center gap-2 text-xs opacity-90">
-                              <span className="line-through opacity-70">$120</span>
+                              <span className="line-through opacity-70">€200</span>
                               <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] font-bold">75% OFF</span>
                             </div>
                           </Button>

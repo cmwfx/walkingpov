@@ -97,6 +97,7 @@ fi
 nginx -t
 systemctl daemon-reload
 systemctl enable --now nginx candidfan-media-verifier.service
+systemctl reload nginx
 systemctl enable candidfan-importer.service
 systemctl restart candidfan-media-verifier.service
 

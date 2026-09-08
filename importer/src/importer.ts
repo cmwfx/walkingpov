@@ -41,6 +41,10 @@ function titleFor(candidate: Candidate) {
   return path.basename(candidate.relative, path.extname(candidate.relative)).replace(/-/g, ' ').slice(0, 500);
 }
 
+function errorCode(error: unknown) {
+  return (error instanceof Error ? error.message : 'processing_failed').toLowerCase().replace(/[^a-z_]/g, '').slice(0, 60) || 'processing_failed';
+}
+
 async function api(pathname: string, init: RequestInit = {}) {
   const response = await fetch(`${websiteUrl}${pathname}`, {
     ...init,
@@ -90,10 +94,10 @@ async function processJob(job: { id: string; source_kind: 'originals' | 'intake'
       successful += 1;
     } catch (error) {
       failed += 1;
-      const errorCode = error instanceof Error ? error.message.replace(/[^a-z_]/g, '').slice(0, 60) : 'processing_failed';
-      console.error('import-item-failed', errorCode || 'processing_failed');
+      const failureCode = errorCode(error);
+      console.error('import-item-failed', failureCode);
       try {
-        if (claim) await api(`/api/import/items/${claim.item_id}/fail`, { method: 'POST', body: JSON.stringify({ error_code: errorCode || 'processing_failed' }) });
+        if (claim) await api(`/api/import/items/${claim.item_id}/fail`, { method: 'POST', body: JSON.stringify({ error_code: failureCode }) });
       } catch { console.error('import-failure-record-failed'); }
     }
   }
@@ -109,8 +113,8 @@ async function main() {
     try {
       const response = await api('/api/import/jobs/next');
       if (response.job) await processJob(response.job);
-    } catch {
-      console.error('importer-cycle-failed');
+    } catch (error) {
+      console.error('importer-cycle-failed', errorCode(error));
     }
     await new Promise((resolve) => setTimeout(resolve, 10_000));
   }

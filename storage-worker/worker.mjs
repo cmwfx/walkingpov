@@ -12,6 +12,7 @@ const WORKER_ID = process.env.WORKER_ID || 'candidfan-storage-' + os.hostname();
 const INBOX = resolve(process.env.INBOX_ROOT || '/root/videos');
 const MEDIA_ROOT = resolve(process.env.MEDIA_ROOT || '/srv/candidfan-media');
 const PROCESS_LIMIT = Number(process.env.PROCESS_LIMIT || 0);
+const PROBE_UNKNOWN = process.env.PROBE_UNKNOWN === 'true';
 const PROCESSING_VERSION = 'candidfan-720p-v1';
 const VIDEO_EXTENSIONS = new Set(['.mp4', '.m4v', '.mov', '.mkv', '.avi', '.webm', '.wmv', '.flv', '.mpeg', '.mpg', '.3gp', '.mts', '.m2ts', '.ts', '.ogv']);
 
@@ -47,6 +48,7 @@ function safeRelative(filePath) {
 
 async function isVideo(filePath) {
   if (VIDEO_EXTENSIONS.has(extname(filePath).toLowerCase())) return true;
+  if (!PROBE_UNKNOWN) return false;
   try {
     await run('ffprobe', ['-v', 'error', '-select_streams', 'v:0', '-show_entries', 'stream=codec_type', '-of', 'default=nw=1:nk=1', filePath], 30_000);
     return true;

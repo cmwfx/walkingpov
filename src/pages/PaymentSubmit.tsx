@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { PremiumBenefits } from '@/components/PremiumBenefits';
 import { DiscountTimer } from '@/components/DiscountTimer';
@@ -65,13 +65,10 @@ export function PaymentSubmit() {
               <h3 className="font-semibold">Contact Information:</h3>
               <div className="space-y-1 text-sm">
                 <p>
-                  <span className="font-medium">Telegram:</span>{' '}
-                  <a href={`https://t.me/${CONTACT_INFO.telegram.replace('@', '')}`}
-                     className="text-primary hover:underline"
-                     target="_blank"
-                     rel="noopener noreferrer">
-                    {CONTACT_INFO.telegram}
-                  </a>
+                  <span className="font-medium">Support:</span>{' '}
+                  <Link to="/support" className="text-primary hover:underline">
+                    Open support page
+                  </Link>
                 </p>
                 <p>
                   <span className="font-medium">Email:</span>{' '}
@@ -81,6 +78,9 @@ export function PaymentSubmit() {
                 </p>
                 <p>
                   <span className="font-medium">Review Time:</span> {CONTACT_INFO.reviewTime}
+                </p>
+                <p className="pt-2 text-muted-foreground">
+                  You will receive an email when your payment review is complete. There is no need to contact support if it has been less than 12 hours.
                 </p>
               </div>
             </div>

@@ -171,7 +171,7 @@ async function processItem(item) {
   await api('/worker/items/' + item.id + '/complete', { method: 'POST', body: JSON.stringify({
     worker_id: WORKER_ID, source_key: sourceKey, work_key: 'work/' + item.id, source_name: item.source_name,
     source_sha256: sourceHash, source_size_bytes: sourceStat.size, source_mime: probeInfo.mime,
-    source_duration_seconds: probeInfo.duration, source_codec: probeInfo.codec, output_key: 'full/' + item.id + '/video.mp4',
+    source_duration_seconds: probeInfo.duration, source_codec: probeInfo.codec, output_key: item.id + '/video.mp4',
     preview_key: 'previews/' + item.id + '/preview.mp4', thumbnail_keys: thumbnailKeys,
     duration_seconds: fullInfo.duration, width: fullInfo.width, height: fullInfo.height,
     output_size_bytes: fullStat.size, preview_size_bytes: previewStat.size, processing_version: PROCESSING_VERSION,

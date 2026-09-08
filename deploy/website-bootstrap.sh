@@ -16,6 +16,8 @@ command -v git >/dev/null || { apt-get update -qq && apt-get install -y -qq git;
 command -v nginx >/dev/null || { apt-get update -qq && apt-get install -y -qq nginx; }
 command -v certbot >/dev/null || { apt-get update -qq && apt-get install -y -qq certbot; }
 id -u candidfan >/dev/null 2>&1 || useradd --system --home-dir /var/www/candidfan --shell /usr/sbin/nologin candidfan
+chown root:candidfan /etc/candidfan/api.env
+chmod 0640 /etc/candidfan/api.env
 
 install -d -m 0755 -o candidfan -g candidfan /var/www/candidfan /var/www/candidfan/releases
 install -d -m 0750 /etc/candidfan

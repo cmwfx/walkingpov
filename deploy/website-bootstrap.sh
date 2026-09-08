@@ -21,6 +21,7 @@ chown root:candidfan /etc/candidfan/api.env
 chmod 0640 /etc/candidfan/api.env
 
 install -d -m 0755 -o candidfan -g candidfan /var/www/candidfan /var/www/candidfan/releases
+install -d -m 0750 -o candidfan -g candidfan /var/lib/candidfan
 install -d -m 0750 /etc/candidfan
 if [[ ! -s /etc/candidfan/frontend.env || ! -s /etc/candidfan/api.env ]]; then
   echo 'website-bootstrap-missing-environment' >&2

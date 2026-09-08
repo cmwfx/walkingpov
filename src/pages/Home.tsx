@@ -1,53 +1,153 @@
-/* eslint-disable react-hooks/set-state-in-effect */
-import type { FormEvent } from 'react';
 import { useEffect, useState } from 'react';
-import { ArrowRight, Search, ShieldCheck, Sparkles } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
-import { getVideos } from '@/lib/api';
-import type { Video } from '@/lib/supabase';
+import { useSearchParams } from 'react-router-dom';
 import { VideoGrid } from '@/components/VideoGrid';
-import { DiscountTimer } from '@/components/DiscountTimer';
-import { Button } from '@/components/ui/button';
+import { VideoGridSkeleton } from '@/components/VideoSkeleton';
+import { Pagination } from '@/components/Pagination';
 import { Input } from '@/components/ui/input';
+import type { Video } from '@/lib/supabase';
+import { getVideos } from '@/lib/api';
+import { Search, X } from 'lucide-react';
+import { useToast } from '@/components/ui/use-toast';
 
 export function Home() {
-  const [params, setParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [videos, setVideos] = useState<Video[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
-  const tag = params.get('tag') || '';
-  const page = Number(params.get('page') || 1);
-  const [search, setSearch] = useState(tag);
+  const [searchTag, setSearchTag] = useState('');
+  const { toast } = useToast();
 
-  useEffect(() => setSearch(tag), [tag]);
+  // Read initial state from URL
+  const currentPage = parseInt(searchParams.get('page') || '1', 10);
+  const filterTag = searchParams.get('tag') || '';
+
   useEffect(() => {
-    setLoading(true);
-    getVideos(page, tag).then((result) => { setVideos(result.videos); setTotalPages(result.pagination.totalPages); }).catch(() => setVideos([])).finally(() => setLoading(false));
-  }, [page, tag]);
+    // Sync search input with URL filter tag
+    if (filterTag) {
+      setSearchTag(filterTag);
+    }
+  }, [filterTag]);
 
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const next = new URLSearchParams();
-    if (search.trim()) next.set('tag', search.trim());
-    next.set('page', '1');
-    setParams(next);
+  useEffect(() => {
+    fetchVideos(currentPage, filterTag);
+    // fetchVideos is intentionally kept local to preserve the original page behavior.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, filterTag]);
+
+  const fetchVideos = async (page: number, tag?: string) => {
+    setLoading(true);
+    try {
+      const data = await getVideos(page, tag);
+      setVideos(data.videos);
+      setTotalPages(data.pagination.totalPages);
+    } catch {
+      toast({
+        title: 'Error',
+        description: 'Failed to load videos',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
   };
 
-  return <div className="relative overflow-hidden">
-    <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,_rgba(124,58,237,.25),_transparent_38%),radial-gradient(circle_at_80%_20%,_rgba(14,165,233,.17),_transparent_30%)]" />
-    <section className="container mx-auto px-4 pb-14 pt-16 md:pt-24">
-      <div className="mx-auto max-w-4xl text-center">
-        <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-violet-300/20 bg-violet-300/10 px-4 py-2 text-sm text-violet-200"><Sparkles className="h-4 w-4" />CandidFan premium library</div>
-        <div className="mb-6 flex flex-wrap items-center justify-center gap-3"><span className="rounded-full bg-rose-500 px-4 py-1.5 text-xs font-black tracking-widest text-white">75% OFF</span><DiscountTimer /></div>
-        <h1 className="text-4xl font-black tracking-tight text-white sm:text-6xl">Your private collection of <span className="bg-gradient-to-r from-fuchsia-300 via-violet-300 to-sky-300 bg-clip-text text-transparent">candid moments.</span></h1>
-        <p className="mx-auto mt-6 max-w-2xl text-lg leading-8 text-slate-300">Browse the public catalog, then unlock lifetime access for €50 when you are ready to download.</p>
-        <div className="mt-8 flex flex-wrap items-center justify-center gap-3"><Link to="/signup"><Button size="lg" className="bg-gradient-to-r from-violet-600 to-sky-600">Get lifetime access <ArrowRight className="ml-2 h-4 w-4" /></Button></Link><Link to="/login"><Button size="lg" variant="outline" className="border-white/15 bg-white/5 text-white">Member login</Button></Link></div>
-        <div className="mt-8 flex flex-wrap justify-center gap-5 text-sm text-slate-400"><span className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-300" />Protected downloads</span><span>One payment</span><span>Private member support</span></div>
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    const newParams = new URLSearchParams();
+    if (searchTag) {
+      newParams.set('tag', searchTag);
+    }
+    newParams.set('page', '1');
+    setSearchParams(newParams);
+  };
+
+  const handlePageChange = (page: number) => {
+    const newParams = new URLSearchParams(searchParams);
+    newParams.set('page', page.toString());
+    setSearchParams(newParams);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const clearFilter = () => {
+    setSearchTag('');
+    setSearchParams(new URLSearchParams());
+  };
+
+  return (
+    <div className="min-h-screen">
+      {/* Animated Background */}
+      <div className="fixed inset-0 -z-10 overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900" />
+        <div className="absolute top-0 -left-4 w-72 h-72 bg-purple-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob" />
+        <div className="absolute top-0 -right-4 w-72 h-72 bg-blue-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-2000" />
+        <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
       </div>
-    </section>
-    <section className="container mx-auto px-4 pb-20">
-      <form onSubmit={submit} className="mx-auto mb-10 flex max-w-3xl gap-2"><div className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Filter by tag or category" className="h-11 border-white/10 bg-white/5 pl-10 text-white placeholder:text-slate-500" /></div><Button type="submit" className="h-11 bg-white/10 text-white hover:bg-white/15">Search</Button></form>
-      {loading ? <div className="py-20 text-center text-slate-400">Loading the collection…</div> : <><VideoGrid videos={videos} />{videos.length === 0 && <div className="py-5 text-center text-slate-400">The collection is being prepared. Check back soon.</div>}{totalPages > 1 && <div className="mt-10 flex justify-center gap-2">{Array.from({ length: totalPages }, (_, index) => index + 1).map((value) => <Button key={value} size="sm" variant={value === page ? 'default' : 'outline'} onClick={() => { const next = new URLSearchParams(params); next.set('page', String(value)); setParams(next); }}>{value}</Button>)}</div>}</>}
-    </section>
-  </div>;
+
+      <div className="container mx-auto px-4 py-8">
+        {/* Search Bar */}
+        <div className="max-w-4xl mx-auto mb-12 pt-4">
+          <form onSubmit={handleSearch} className="relative">
+            <div className="relative bg-white/5 backdrop-blur-md border border-white/10 rounded-xl overflow-hidden hover:bg-white/10 transition-all">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <Input
+                type="text"
+                placeholder="Search videos by tag or category..."
+                value={searchTag}
+                onChange={(e) => setSearchTag(e.target.value)}
+                className="pl-12 pr-12 py-6 bg-transparent border-0 text-white placeholder:text-gray-500 focus-visible:ring-1 focus-visible:ring-purple-500"
+              />
+              {filterTag && (
+                <button
+                  type="button"
+                  onClick={clearFilter}
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 p-2 text-gray-400 hover:text-white transition-colors"
+                  aria-label="Clear search"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
+            </div>
+            {filterTag && (
+              <p className="text-sm text-gray-400 mt-2">
+                Showing results for:{' '}
+                <span className="font-semibold text-purple-400">{filterTag}</span>
+              </p>
+            )}
+          </form>
+        </div>
+
+        {/* Video Grid */}
+        <div>
+          {loading ? (
+            <VideoGridSkeleton />
+          ) : videos.length === 0 ? (
+            <div className="text-center py-20">
+              <div className="text-gray-400 text-lg mb-4">No videos found</div>
+              {filterTag && (
+                <button
+                  onClick={clearFilter}
+                  className="text-purple-400 hover:text-purple-300 underline"
+                >
+                  Clear search and show all videos
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <VideoGrid videos={videos} />
+              {totalPages > 1 && (
+                <div className="mt-12">
+                  <Pagination
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={handlePageChange}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 }

@@ -29,6 +29,15 @@ const PROCESS_CONCURRENCY = Math.max(1, Number(process.env.PROCESS_CONCURRENCY |
 const SFTP_DOWNLOAD_CONCURRENCY = Math.max(1, Number(process.env.SFTP_DOWNLOAD_CONCURRENCY || 8));
 const SFTP_DOWNLOAD_CHUNK_SIZE = Math.max(32 * 1024, Number(process.env.SFTP_DOWNLOAD_CHUNK_SIZE || 64 * 1024));
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 15_000);
+let shutdownRequested = false;
+
+function requestShutdown(signal) {
+  shutdownRequested = true;
+  console.log('RunPod processor shutdown requested; finishing active items before exit; signal=' + signal);
+}
+
+process.once('SIGTERM', () => requestShutdown('SIGTERM'));
+process.once('SIGINT', () => requestShutdown('SIGINT'));
 
 if (!WORKER_TOKEN) throw new Error('WORKER_TOKEN is required');
 if (!REMOTE_HOST) throw new Error('REMOTE_STORAGE_HOST is required');
@@ -254,7 +263,7 @@ async function processLoop(index) {
   let completed = 0;
   let sftp = null;
   try {
-    while (PROCESS_LIMIT === 0 || completed < PROCESS_LIMIT) {
+    while (!shutdownRequested && (PROCESS_LIMIT === 0 || completed < PROCESS_LIMIT)) {
       const claim = await api('/worker/items/claim', { method: 'POST', body: JSON.stringify({ worker_id: workerId, pool: 'remote' }) });
       if (!claim.item) break;
       try {
@@ -286,7 +295,7 @@ async function main() {
 async function loop() {
   await clearStaleWork();
   console.log('RunPod processor ready; concurrency=' + PROCESS_CONCURRENCY + ' ffmpeg_threads=' + FFMPEG_THREADS + ' sftp_download_concurrency=' + SFTP_DOWNLOAD_CONCURRENCY + ' sftp_download_chunk_size=' + SFTP_DOWNLOAD_CHUNK_SIZE + ' detected_vcpu=' + CPU_COUNT);
-  while (true) {
+  while (!shutdownRequested) {
     try {
       const processed = await main();
       if (processed > 0) console.log('RunPod processor cycle complete; processed=' + processed);
@@ -295,6 +304,7 @@ async function loop() {
     }
     await sleep(POLL_INTERVAL_MS);
   }
+  console.log('RunPod processor stopped cleanly');
 }
 
 await loop();

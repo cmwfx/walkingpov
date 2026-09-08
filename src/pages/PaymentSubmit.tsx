@@ -116,25 +116,11 @@ export function PaymentSubmit() {
           </div>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6 mb-8">
-          <Card
-            className="cursor-pointer transition-all ring-2 ring-primary"
-          >
-            <CardHeader>
-              <div className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
-                <CardTitle>REWARBLE VISA Gift Card</CardTitle>
-              </div>
-              <CardDescription>Pay with Paypal, Visa, Mastercard etc</CardDescription>
-            </CardHeader>
-          </Card>
-        </div>
-
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>REWARBLE VISA Gift Card Payment</CardTitle>
             <CardDescription>
-              Purchase a €50 REWARBLE VISA gift card from the link below and submit the gift card code
+              Purchase a €50 REWARBLE VISA gift card from the link below and submit the gift card code. Pay with Paypal, Visa, Mastercard, Crypto
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -153,20 +139,20 @@ export function PaymentSubmit() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Submit Payment Proof</CardTitle>
+            <CardTitle>Gift Card Code</CardTitle>
             <CardDescription>
-              Enter your REWARBLE VISA gift card code
+              Your code looks like PY4NW2H7EWKZKTS5 with letters and numbers
             </CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="proof">
-                  REWARBLE VISA Gift Card Code
+                  Gift Card Code
                 </Label>
                 <Input
                   id="proof"
-                  placeholder="Enter REWARBLE VISA gift card code"
+                  placeholder="PY4NW2H7EWKZKTS5"
                   value={proof}
                   onChange={(e) => setProof(e.target.value)}
                   maxLength={500}

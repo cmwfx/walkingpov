@@ -4,7 +4,11 @@ import { twMerge } from 'tailwind-merge';
 export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
 export const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 export const GIFT_CARD_LINK = 'https://www.g2a.com/rewarble-visa-gift-card-50-eur-by-rewarble-key-global-i10000502992084';
-export const CONTACT_INFO = { reviewTime: 'within 24 hours' };
+export const CONTACT_INFO = {
+  telegram: '@walkingpov',
+  email: 'walkingpov@proton.me',
+  reviewTime: 'within 24 hours',
+};
 
 export function formatDate(dateString: string) {
   return new Date(dateString).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });

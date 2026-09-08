@@ -57,6 +57,7 @@ export function createApp() {
 
   app.use('/api', (req, res, next) => {
     if (isInternalImporterRequest(req)) return next();
+    if (req.method === 'GET' && (req.path === '/videos' || req.path.startsWith('/videos/'))) return next();
     return ['GET', 'HEAD'].includes(req.method) ? readApiLimiter(req, res, next) : apiLimiter(req, res, next);
   });
   app.get('/api/csrf-token', generateCsrfToken, (req, res) => {

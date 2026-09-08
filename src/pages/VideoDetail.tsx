@@ -8,8 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { PremiumBenefits } from '@/components/PremiumBenefits';
 import { DiscountTimer } from '@/components/DiscountTimer';
-import { Download, Lock, Tag, Calendar, Crown, ArrowLeft, Sparkles, ImagePlus } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+import { Download, Lock, Tag, Crown, ArrowLeft, Sparkles, ImagePlus } from 'lucide-react';
 import { getResponsiveImageUrls, generateSrcSet, getPrimaryImageUrl } from '@/lib/imageUtils';
 
 type DownloadLink = {
@@ -173,13 +172,6 @@ export function VideoDetail() {
                 <CardTitle className="text-2xl md:text-3xl">{video.title}</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
-                    <span>{formatDate(video.created_at)}</span>
-                  </div>
-                </div>
-
                 {video.tags && video.tags.length > 0 && (
                   <div className="flex items-start gap-2">
                     <Tag className="h-4 w-4 text-muted-foreground mt-1" />

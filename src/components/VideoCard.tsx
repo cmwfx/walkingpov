@@ -2,8 +2,7 @@ import { Link } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import type { Video } from '@/lib/supabase';
 import { Card } from '@/components/ui/card';
-import { Clock, Tag, Play, Sparkles } from 'lucide-react';
-import { formatDate } from '@/lib/utils';
+import { Tag, Play, Sparkles } from 'lucide-react';
 import { getResponsiveImageUrls, generateSrcSet, getPrimaryImageUrl } from '@/lib/imageUtils';
 
 interface VideoCardProps {
@@ -115,10 +114,6 @@ export function VideoCard({ video }: VideoCardProps) {
               
               {/* Metadata Row */}
               <div className="flex items-center gap-3 text-sm text-gray-200">
-                <div className="flex items-center gap-1.5 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full">
-                  <Clock className="h-3.5 w-3.5" />
-                  <span className="font-medium">{formatDate(video.created_at)}</span>
-                </div>
                 <div className="flex items-center gap-1 bg-black/40 backdrop-blur-sm px-3 py-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity">
                   <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
                   <span className="font-medium">Exclusive</span>

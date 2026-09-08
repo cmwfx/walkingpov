@@ -62,8 +62,9 @@ export function VideoCard({ video, onFeaturedChange }: VideoCardProps) {
   };
 
   return (
-    <Card className="relative h-full overflow-hidden border-white/10 bg-white/5 backdrop-blur-sm transition-all duration-500 hover:bg-white/10 hover:scale-[1.02] hover:shadow-2xl hover:shadow-purple-500/30">
-      <Link to={`/video/${video.id}`} className="group block h-full">
+    <div className="group relative h-full">
+      <Card className="relative overflow-hidden border-white/10 bg-white/5 backdrop-blur-sm transition-all duration-500 hover:bg-white/10 hover:scale-[1.02] hover:shadow-2xl hover:shadow-purple-500/30">
+        <Link to={`/video/${video.id}`} className="block">
         <div ref={imgRef} className="aspect-[16/10] relative overflow-hidden bg-gradient-to-br from-purple-900/20 to-blue-900/20">
           {!imageLoaded && imageSrc && <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-blue-900/40 animate-pulse" />}
 
@@ -91,40 +92,41 @@ export function VideoCard({ video, onFeaturedChange }: VideoCardProps) {
           </div>
 
         </div>
+        </Link>
 
-        <div className="p-5">
-          {video.is_featured && !isAdmin && (
-            <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-yellow-300/30 bg-yellow-300/10 px-3 py-1 text-xs font-medium text-yellow-200">
-              <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
-              <span>Featured</span>
-            </div>
-          )}
-          <h3 className="mb-3 line-clamp-2 text-lg font-bold leading-tight text-white md:text-xl">{video.title}</h3>
-          <div className="mb-4 flex items-center gap-3 text-sm text-gray-200">
-            <div className="flex items-center gap-1 rounded-full bg-black/30 px-3 py-1 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
-              <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
-              <span className="font-medium">Exclusive</span>
+        {isAdmin && (
+          <button type="button" aria-label={video.is_featured ? 'Remove featured status' : 'Feature this post'} aria-pressed={video.is_featured} disabled={featuredBusy} onClick={() => void toggleFeatured()} className={`absolute right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border backdrop-blur-md transition ${video.is_featured ? 'border-rose-300/50 bg-rose-500/25 text-rose-200' : 'border-white/20 bg-black/60 text-white hover:border-rose-300/50 hover:bg-rose-500/20 hover:text-rose-200'} disabled:cursor-wait disabled:opacity-60`}>
+            <Heart className="h-5 w-5" fill={video.is_featured ? 'currentColor' : 'none'} />
+          </button>
+        )}
+      </Card>
+
+      <Link to={`/video/${video.id}`} className="block px-1 pt-4">
+        {video.is_featured && !isAdmin && (
+          <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-yellow-300/30 bg-yellow-300/10 px-3 py-1 text-xs font-medium text-yellow-200">
+            <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
+            <span>Featured</span>
+          </div>
+        )}
+        <h3 className="mb-3 line-clamp-2 text-lg font-bold leading-tight text-white md:text-xl">{video.title}</h3>
+        <div className="mb-4 flex items-center gap-3 text-sm text-gray-200">
+          <div className="flex items-center gap-1 rounded-full bg-black/30 px-3 py-1 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+            <Sparkles className="h-3.5 w-3.5 text-yellow-400" />
+            <span className="font-medium">Exclusive</span>
+          </div>
+        </div>
+        {video.tags && video.tags.length > 0 && (
+          <div className="flex items-start gap-2.5">
+            <Tag className="mt-1 h-4 w-4 flex-shrink-0 text-purple-400" />
+            <div className="flex flex-wrap items-center gap-2">
+              {video.tags.slice(0, 4).map((tag, index) => (
+                <span key={index} className="rounded-full border border-purple-500/30 bg-gradient-to-r from-purple-500/20 to-blue-500/20 px-3 py-1.5 text-xs font-medium text-purple-300 transition-all hover:border-purple-400/60 hover:bg-purple-500/30">{tag}</span>
+              ))}
+              {video.tags.length > 4 && <span className="px-2 text-xs font-medium text-gray-400">+{video.tags.length - 4}</span>}
             </div>
           </div>
-          {video.tags && video.tags.length > 0 && (
-            <div className="flex items-start gap-2.5">
-              <Tag className="mt-1 h-4 w-4 flex-shrink-0 text-purple-400" />
-              <div className="flex flex-wrap items-center gap-2">
-                {video.tags.slice(0, 4).map((tag, index) => (
-                  <span key={index} className="rounded-full border border-purple-500/30 bg-gradient-to-r from-purple-500/20 to-blue-500/20 px-3 py-1.5 text-xs font-medium text-purple-300 transition-all hover:border-purple-400/60 hover:bg-purple-500/30">{tag}</span>
-                ))}
-                {video.tags.length > 4 && <span className="px-2 text-xs font-medium text-gray-400">+{video.tags.length - 4}</span>}
-              </div>
-            </div>
-          )}
-        </div>
+        )}
       </Link>
-
-      {isAdmin && (
-        <button type="button" aria-label={video.is_featured ? 'Remove featured status' : 'Feature this post'} aria-pressed={video.is_featured} disabled={featuredBusy} onClick={() => void toggleFeatured()} className={`absolute right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border backdrop-blur-md transition ${video.is_featured ? 'border-rose-300/50 bg-rose-500/25 text-rose-200' : 'border-white/20 bg-black/60 text-white hover:border-rose-300/50 hover:bg-rose-500/20 hover:text-rose-200'} disabled:cursor-wait disabled:opacity-60`}>
-          <Heart className="h-5 w-5" fill={video.is_featured ? 'currentColor' : 'none'} />
-        </button>
-      )}
-    </Card>
+    </div>
   );
 }

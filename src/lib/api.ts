@@ -48,10 +48,11 @@ export async function updateVideoThumbnail(id: string, file: File) {
   if (!response.ok) throw new Error(body.error || 'Unable to update the video thumbnail.');
   return body as { thumbnail_url: string };
 }
+export const setVideoFeatured = (id: string, is_featured: boolean) => request<{ is_featured: boolean }>(`/api/admin/videos/${encodeURIComponent(id)}/featured`, { method: 'POST', body: JSON.stringify({ is_featured }) }, true);
 export const submitPayment = (proof: string) => request('/api/payments/submit', { method: 'POST', body: JSON.stringify({ proof }) }, true);
 export const getPaymentRequests = () => request<import('./supabase').PaymentRequest[]>('/api/payments/requests', {}, true);
 export const reviewPayment = (id: string, decision: 'approved' | 'denied', notes: string) => request(`/api/payments/${id}/review`, { method: 'POST', body: JSON.stringify({ decision, notes }) }, true);
-export const getAdminStats = () => request<{ total_videos: number; total_users: number; pending_payments: number; premium_users: number }>('/api/admin/stats', {}, true);
+export const getAdminStats = () => request<{ total_videos: number; total_users: number; pending_payments: number; premium_users: number; unread_support: number }>('/api/admin/stats', {}, true);
 export const getTickets = () => request<import('./supabase').SupportTicket[]>('/api/support', {}, true);
 export const createTicket = (subject: string, body: string) => request<{ id: string }>('/api/support', { method: 'POST', body: JSON.stringify({ subject, body }) }, true);
 export const getTicket = (id: string) => request<import('./supabase').SupportTicket & { messages: import('./supabase').SupportMessage[] }>(`/api/support/${encodeURIComponent(id)}`, {}, true);

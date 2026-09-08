@@ -19,8 +19,9 @@ router.get('/', async (req, res) => {
   const tag = typeof req.query.tag === 'string' ? req.query.tag.trim().slice(0, 80) : '';
   let query = supabaseAdmin
     .from('videos')
-    .select('id, title, thumbnail_url, tags, created_at, updated_at', { count: 'exact' })
+    .select('id, title, thumbnail_url, tags, is_featured, created_at, updated_at', { count: 'exact' })
     .eq('status', 'ready')
+    .order('is_featured', { ascending: false })
     .order('created_at', { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1);
   if (tag) query = query.contains('tags', [tag]);
@@ -39,7 +40,7 @@ router.get('/:id', async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Video not found' });
   const { data, error } = await supabaseAdmin
     .from('videos')
-    .select('id, title, thumbnail_url, tags, created_at, updated_at')
+    .select('id, title, thumbnail_url, tags, is_featured, created_at, updated_at')
     .eq('id', req.params.id)
     .eq('status', 'ready')
     .maybeSingle();

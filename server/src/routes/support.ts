@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { AuthRequest, verifyToken } from '../middleware/auth.js';
 import { supabaseAdmin } from '../config/supabase.js';
+import { getUnreadTicketIds, markTicketRead } from '../services/supportUnread.js';
 
 const router = Router();
 
@@ -38,7 +39,13 @@ router.get('/', verifyToken, async (req: AuthRequest, res) => {
     console.error('support-list-failed');
     return res.status(500).json({ error: 'Unable to load support tickets.' });
   }
-  return res.json(data || []);
+  try {
+    const unread = await getUnreadTicketIds(req.user!.id, (data || []).map((ticket) => ticket.id));
+    return res.json((data || []).map((ticket) => ({ ...ticket, unread: unread.has(ticket.id) })));
+  } catch {
+    console.error('support-unread-read-failed');
+    return res.status(500).json({ error: 'Unable to load support notifications.' });
+  }
 });
 
 router.post('/', verifyToken, async (req: AuthRequest, res) => {
@@ -61,6 +68,7 @@ router.get('/:id', verifyToken, async (req: AuthRequest, res) => {
   try {
     const ticket = await readTicket(req.params.id, req.user!.id, req.user!.is_admin);
     if (!ticket) return res.status(404).json({ error: 'Support ticket not found.' });
+    await markTicketRead(req.params.id, req.user!.id);
     return res.json(ticket);
   } catch {
     console.error('support-read-failed');

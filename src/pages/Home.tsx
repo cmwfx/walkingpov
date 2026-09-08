@@ -17,6 +17,15 @@ export function Home() {
   const [searchTag, setSearchTag] = useState('');
   const { toast } = useToast();
 
+  const handleFeaturedChange = (videoId: string, isFeatured: boolean) => {
+    setVideos((current) => current
+      .map((video) => video.id === videoId ? { ...video, is_featured: isFeatured } : video)
+      .sort((a, b) => Number(b.is_featured) - Number(a.is_featured) || new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.set('page', '1');
+    setSearchParams(nextParams);
+  };
+
   // Read initial state from URL
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
   const filterTag = searchParams.get('tag') || '';
@@ -134,7 +143,7 @@ export function Home() {
             </div>
           ) : (
             <>
-              <VideoGrid videos={videos} />
+              <VideoGrid videos={videos} onFeaturedChange={handleFeaturedChange} />
               {totalPages > 1 && (
                 <div className="mt-12">
                   <Pagination

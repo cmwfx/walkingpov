@@ -4,9 +4,10 @@ import { Film } from 'lucide-react';
 
 interface VideoGridProps {
   videos: Video[];
+  onFeaturedChange?: (videoId: string, isFeatured: boolean) => void;
 }
 
-export function VideoGrid({ videos }: VideoGridProps) {
+export function VideoGrid({ videos, onFeaturedChange }: VideoGridProps) {
   if (videos.length === 0) {
     return (
       <div className="text-center py-24">
@@ -22,7 +23,7 @@ export function VideoGrid({ videos }: VideoGridProps) {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
       {videos.map((video) => (
-        <VideoCard key={video.id} video={video} />
+        <VideoCard key={video.id} video={video} onFeaturedChange={onFeaturedChange} />
       ))}
     </div>
   );

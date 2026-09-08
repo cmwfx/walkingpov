@@ -7,6 +7,7 @@ import { AuthRequest, requireAdmin, verifyToken } from '../middleware/auth.js';
 import { uploadLimiter } from '../middleware/rateLimiter.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { signMediaKey } from '../services/mediaSignature.js';
+import { getUnreadTicketIds } from '../services/supportUnread.js';
 
 const router = Router();
 const mediaBaseUrl = (process.env.MEDIA_BASE_URL || 'https://media.candidfan.com').replace(/\/$/, '');
@@ -31,18 +32,25 @@ function parseThumbnailUpload(req: AuthRequest, res: Response, next: NextFunctio
   });
 }
 
-router.get('/stats', verifyToken, requireAdmin, async (_req: AuthRequest, res) => {
-  const [videos, users, payments, premium] = await Promise.all([
+router.get('/stats', verifyToken, requireAdmin, async (req: AuthRequest, res) => {
+  const [videos, users, payments, premium, support] = await Promise.all([
     supabaseAdmin.from('videos').select('id', { count: 'exact', head: true }).eq('status', 'ready'),
     supabaseAdmin.from('users').select('id', { count: 'exact', head: true }),
     supabaseAdmin.from('payment_requests').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
     supabaseAdmin.from('users').select('id', { count: 'exact', head: true }).eq('membership_status', 'premium'),
+    supabaseAdmin.from('support_tickets').select('id'),
   ]);
-  if (videos.error || users.error || payments.error || premium.error) {
+  if (videos.error || users.error || payments.error || premium.error || support.error) {
     console.error('admin-stats-read-failed');
     return res.status(500).json({ error: 'Unable to load admin statistics' });
   }
-  return res.json({ total_videos: videos.count || 0, total_users: users.count || 0, pending_payments: payments.count || 0, premium_users: premium.count || 0 });
+  try {
+    const unreadSupport = await getUnreadTicketIds(req.user!.id, (support.data || []).map((ticket) => ticket.id));
+    return res.json({ total_videos: videos.count || 0, total_users: users.count || 0, pending_payments: payments.count || 0, premium_users: premium.count || 0, unread_support: unreadSupport.size });
+  } catch {
+    console.error('admin-support-unread-read-failed');
+    return res.status(500).json({ error: 'Unable to load admin notifications' });
+  }
 });
 
 router.post('/videos/:id/thumbnail', verifyToken, requireAdmin, uploadLimiter, parseThumbnailUpload, async (req: AuthRequest, res) => {
@@ -121,7 +129,36 @@ router.post('/videos/:id/thumbnail', verifyToken, requireAdmin, uploadLimiter, p
   return res.json({ thumbnail_url: thumbnailUrl });
 });
 
-router.get('/support', verifyToken, requireAdmin, async (_req: AuthRequest, res) => {
+router.post('/videos/:id/featured', verifyToken, requireAdmin, async (req: AuthRequest, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Video not found.' });
+  if (typeof req.body?.is_featured !== 'boolean') return res.status(400).json({ error: 'Featured status is required.' });
+
+  const { data, error } = await supabaseAdmin
+    .from('videos')
+    .update({ is_featured: req.body.is_featured })
+    .eq('id', req.params.id)
+    .eq('status', 'ready')
+    .select('id, is_featured')
+    .maybeSingle();
+  if (error) {
+    console.error('video-featured-update-failed');
+    return res.status(500).json({ error: 'Unable to update the featured status.' });
+  }
+  if (!data) return res.status(404).json({ error: 'Video not found.' });
+
+  const { error: auditError } = await supabaseAdmin.from('audit_logs').insert({
+    actor_id: req.user!.id,
+    action: req.body.is_featured ? 'video_featured' : 'video_unfeatured',
+    resource_type: 'video',
+    resource_id: data.id,
+    details: { is_featured: data.is_featured },
+  });
+  if (auditError) console.error('video-featured-audit-failed');
+
+  return res.json({ is_featured: data.is_featured });
+});
+
+router.get('/support', verifyToken, requireAdmin, async (req: AuthRequest, res) => {
   const { data, error } = await supabaseAdmin
     .from('support_tickets')
     .select('id, user_id, subject, status, created_at, updated_at')
@@ -135,7 +172,13 @@ router.get('/support', verifyToken, requireAdmin, async (_req: AuthRequest, res)
   const owners = ids.length ? await supabaseAdmin.from('users').select('id, email').in('id', ids) : { data: [], error: null };
   if (owners.error) return res.status(500).json({ error: 'Unable to load ticket owners.' });
   const emailById = new Map((owners.data || []).map((owner) => [owner.id, owner.email]));
-  return res.json((data || []).map((ticket) => ({ ...ticket, email: emailById.get(ticket.user_id) || 'unknown' })));
+  try {
+    const unread = await getUnreadTicketIds(req.user!.id, (data || []).map((ticket) => ticket.id));
+    return res.json((data || []).map((ticket) => ({ ...ticket, email: emailById.get(ticket.user_id) || 'unknown', unread: unread.has(ticket.id) })));
+  } catch {
+    console.error('admin-support-unread-read-failed');
+    return res.status(500).json({ error: 'Unable to load support notifications.' });
+  }
 });
 
 export default router;

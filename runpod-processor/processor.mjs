@@ -23,6 +23,11 @@ const CPU_COUNT = typeof os.availableParallelism === 'function' ? os.availablePa
 const DEFAULT_FFMPEG_THREADS = Math.max(1, Math.min(4, CPU_COUNT));
 const FFMPEG_THREADS = Math.max(1, Number(process.env.FFMPEG_THREADS || DEFAULT_FFMPEG_THREADS));
 const PROCESS_CONCURRENCY = Math.max(1, Number(process.env.PROCESS_CONCURRENCY || Math.floor(CPU_COUNT / FFMPEG_THREADS)));
+// ssh2's fastGet default is 64 in-flight reads per connection. Four workers
+// would therefore pressure the one-vCPU storage VPS with up to 256 requests.
+// Keep aggregate read pressure bounded while using larger chunks.
+const SFTP_DOWNLOAD_CONCURRENCY = Math.max(1, Number(process.env.SFTP_DOWNLOAD_CONCURRENCY || 8));
+const SFTP_DOWNLOAD_CHUNK_SIZE = Math.max(32 * 1024, Number(process.env.SFTP_DOWNLOAD_CHUNK_SIZE || 64 * 1024));
 const POLL_INTERVAL_MS = Number(process.env.POLL_INTERVAL_MS || 15_000);
 
 if (!WORKER_TOKEN) throw new Error('WORKER_TOKEN is required');
@@ -98,7 +103,10 @@ async function downloadSource(sftp, item, destination) {
   try {
     before = await sftp.stat(remoteSource);
     if (Number(before.size) !== Number(item.source_size_bytes)) throw new Error('SOURCE_CHANGED');
-    await sftp.fastGet(remoteSource, destination);
+    await sftp.fastGet(remoteSource, destination, {
+      concurrency: SFTP_DOWNLOAD_CONCURRENCY,
+      chunkSize: SFTP_DOWNLOAD_CHUNK_SIZE,
+    });
     const after = await sftp.stat(remoteSource);
     if (Number(after.size) !== Number(item.source_size_bytes) || Math.abs(Number(after.modifyTime || 0) - Number(item.source_mtime_ms)) > 2000) throw new Error('SOURCE_CHANGED');
     const local = await stat(destination);
@@ -277,7 +285,7 @@ async function main() {
 
 async function loop() {
   await clearStaleWork();
-  console.log('RunPod processor ready; concurrency=' + PROCESS_CONCURRENCY + ' ffmpeg_threads=' + FFMPEG_THREADS + ' detected_vcpu=' + CPU_COUNT);
+  console.log('RunPod processor ready; concurrency=' + PROCESS_CONCURRENCY + ' ffmpeg_threads=' + FFMPEG_THREADS + ' sftp_download_concurrency=' + SFTP_DOWNLOAD_CONCURRENCY + ' sftp_download_chunk_size=' + SFTP_DOWNLOAD_CHUNK_SIZE + ' detected_vcpu=' + CPU_COUNT);
   while (true) {
     try {
       const processed = await main();

@@ -16,6 +16,11 @@ import admin from './routes/admin.js';
 import { supabaseAdmin } from './config/supabase.js';
 
 const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
+const importerToken = process.env.IMPORTER_TOKEN || '';
+
+function isInternalImporterRequest(req: Request) {
+  return req.path.startsWith('/import/') && importerToken && req.headers.authorization === `Bearer ${importerToken}`;
+}
 
 export function createApp() {
   const app = express();
@@ -50,7 +55,10 @@ export function createApp() {
     return res.json({ status: 'ok' });
   });
 
-  app.use('/api', apiLimiter);
+  app.use('/api', (req, res, next) => {
+    if (isInternalImporterRequest(req)) return next();
+    return apiLimiter(req, res, next);
+  });
   app.get('/api/csrf-token', generateCsrfToken, (req, res) => {
     const token = (req as Request & { csrfToken?: () => string }).csrfToken?.();
     return res.json({ csrfToken: token });

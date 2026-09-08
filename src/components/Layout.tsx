@@ -18,7 +18,7 @@ export function Layout() {
               Made with <Heart className="h-4 w-4 text-red-500 fill-red-500" /> for premium content lovers
             </p>
             <p className="text-xs text-gray-500">
-              &copy; 2026 WalkingPOV. All rights reserved. Lifetime Premium Access for just $30.
+              &copy; 2026 CandidFan. All rights reserved. Lifetime Premium Access for just €50.
             </p>
             <div className="flex items-center justify-center gap-4 text-xs text-gray-600">
               <span>Privacy Policy</span>

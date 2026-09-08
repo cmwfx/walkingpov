@@ -20,7 +20,7 @@ export function Navbar() {
                 <div className="absolute inset-0 blur-md bg-purple-400 opacity-0 group-hover:opacity-50 transition-opacity" />
               </div>
               <span className="bg-gradient-to-r from-purple-400 via-pink-400 to-blue-400 bg-clip-text text-transparent group-hover:from-purple-300 group-hover:via-pink-300 group-hover:to-blue-300 transition-all">
-                WalkingPOV
+                CandidFan
               </span>
             </Link>
             <div className="hidden md:flex items-center gap-2">

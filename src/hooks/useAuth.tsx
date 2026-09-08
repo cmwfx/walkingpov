@@ -30,9 +30,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const refreshUser = async () => { try { setUser((await getMe()).user); } catch { setUser(null); } };
   useEffect(() => {
     let mounted = true;
-    const load = async (nextSession: Session | null) => { if (!mounted) return; setSession(nextSession); if (nextSession) await refreshUser(); else setUser(null); if (mounted) setLoading(false); };
-    supabase.auth.getSession().then(({ data }) => void load(data.session));
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, nextSession) => void load(nextSession));
+    let initialLoadStarted = false;
+    const load = async (nextSession: Session | null, shouldRefresh: boolean) => {
+      if (!mounted) return;
+      setSession(nextSession);
+      if (!nextSession) setUser(null);
+      else if (shouldRefresh) await refreshUser();
+      if (mounted) setLoading(false);
+    };
+    const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (event === 'INITIAL_SESSION') {
+        if (initialLoadStarted) return;
+        initialLoadStarted = true;
+        void load(nextSession, true);
+        return;
+      }
+      void load(nextSession, event === 'SIGNED_IN' || event === 'USER_UPDATED');
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      if (initialLoadStarted) return;
+      initialLoadStarted = true;
+      void load(data.session, true);
+    });
     return () => { mounted = false; listener.subscription.unsubscribe(); };
   }, []);
   const value = useMemo<AuthContext>(() => ({

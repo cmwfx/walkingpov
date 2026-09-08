@@ -13,6 +13,18 @@ export const apiLimiter = rateLimit({
 });
 
 /**
+ * Read-only API rate limiter
+ * Allows normal browsing across several tabs without changing mutation limits.
+ */
+export const readApiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  message: 'Too many read requests from this IP, please try again later.',
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+/**
  * Email notification rate limiter
  * Limits: 10 emails per hour per IP
  */

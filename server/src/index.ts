@@ -5,7 +5,7 @@ import cors from 'cors';
 import express, { NextFunction, Request, Response } from 'express';
 import helmet from 'helmet';
 import path from 'node:path';
-import { apiLimiter } from './middleware/rateLimiter.js';
+import { apiLimiter, readApiLimiter } from './middleware/rateLimiter.js';
 import { generateCsrfToken, verifyCsrfToken } from './middleware/csrf.js';
 import { AuthRequest, verifyToken } from './middleware/auth.js';
 import videos from './routes/videos.js';
@@ -57,7 +57,7 @@ export function createApp() {
 
   app.use('/api', (req, res, next) => {
     if (isInternalImporterRequest(req)) return next();
-    return apiLimiter(req, res, next);
+    return ['GET', 'HEAD'].includes(req.method) ? readApiLimiter(req, res, next) : apiLimiter(req, res, next);
   });
   app.get('/api/csrf-token', generateCsrfToken, (req, res) => {
     const token = (req as Request & { csrfToken?: () => string }).csrfToken?.();

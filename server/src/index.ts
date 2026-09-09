@@ -22,6 +22,10 @@ function isInternalImporterRequest(req: Request) {
   return req.path.startsWith('/import/') && importerToken && req.headers.authorization === `Bearer ${importerToken}`;
 }
 
+function isMeRequest(req: Request) {
+  return req.method === 'GET' && req.path === '/me';
+}
+
 function isAdminThumbnailUpload(req: Request) {
   return req.method === 'POST' && /^\/admin\/videos\/[^/]+\/thumbnail$/.test(req.path);
 }
@@ -61,6 +65,7 @@ export function createApp() {
 
   app.use('/api', (req, res, next) => {
     if (isInternalImporterRequest(req)) return next();
+    if (isMeRequest(req)) return next();
     if (isAdminThumbnailUpload(req)) return next();
     if (req.method === 'GET' && (req.path === '/videos' || req.path.startsWith('/videos/'))) return next();
     return ['GET', 'HEAD'].includes(req.method) ? readApiLimiter(req, res, next) : apiLimiter(req, res, next);

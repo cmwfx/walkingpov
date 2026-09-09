@@ -4,7 +4,7 @@ import { fileTypeFromBuffer } from 'file-type';
 import multer from 'multer';
 import sharp from 'sharp';
 import { AuthRequest, requireAdmin, verifyToken } from '../middleware/auth.js';
-import { uploadLimiter } from '../middleware/rateLimiter.js';
+import { adminThumbnailUploadLimiter } from '../middleware/rateLimiter.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { signMediaKey } from '../services/mediaSignature.js';
 import { getUnreadTicketIds } from '../services/supportUnread.js';
@@ -53,7 +53,7 @@ router.get('/stats', verifyToken, requireAdmin, async (req: AuthRequest, res) =>
   }
 });
 
-router.post('/videos/:id/thumbnail', verifyToken, requireAdmin, uploadLimiter, parseThumbnailUpload, async (req: AuthRequest, res) => {
+router.post('/videos/:id/thumbnail', adminThumbnailUploadLimiter, verifyToken, requireAdmin, parseThumbnailUpload, async (req: AuthRequest, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Video not found.' });
   if (!mediaSigningSecret) return res.status(503).json({ error: 'Thumbnail uploads are temporarily unavailable.' });
   if (!req.file?.buffer?.length) return res.status(400).json({ error: 'Choose a thumbnail image first.' });

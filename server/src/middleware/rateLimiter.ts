@@ -37,13 +37,13 @@ export const emailLimiter = rateLimit({
 });
 
 /**
- * Upload rate limiter (for bulk uploads)
- * Limits: 20 uploads per hour per IP
+ * Admin thumbnail batches may contain the whole catalog, so keep a higher
+ * endpoint-specific guard instead of counting them as ordinary API mutations.
  */
-export const uploadLimiter = rateLimit({
-  windowMs: 60 * 60 * 1000, // 1 hour
-  max: 20,
-  message: 'Too many upload requests from this IP, please try again later.',
+export const adminThumbnailUploadLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 1000,
+  message: 'Too many thumbnail upload requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
 });

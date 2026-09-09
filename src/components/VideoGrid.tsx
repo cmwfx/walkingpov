@@ -21,7 +21,7 @@ export function VideoGrid({ videos, onFeaturedChange }: VideoGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-8">
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
       {videos.map((video) => (
         <VideoCard key={video.id} video={video} onFeaturedChange={onFeaturedChange} />
       ))}

@@ -20,7 +20,7 @@ function normalizeSearchText(value: string) {
 
 function videoMatchesSearch(video: { title: string; tags?: string[] | null }, search: string) {
   const needle = normalizeSearchText(search);
-  if (!needle) return true;
+  if (!needle) return false;
   return [video.title, ...(video.tags || [])].some((value) => normalizeSearchText(value).includes(needle));
 }
 

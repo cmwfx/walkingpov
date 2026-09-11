@@ -27,9 +27,7 @@ export function Home() {
 
   useEffect(() => {
     // Sync search input with URL filter tag
-    if (filterTag) {
-      setSearchTag(filterTag);
-    }
+    setSearchTag(filterTag);
   }, [filterTag]);
 
   useEffect(() => {
@@ -58,8 +56,9 @@ export function Home() {
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     const newParams = new URLSearchParams();
-    if (searchTag) {
-      newParams.set('tag', searchTag);
+    const trimmedSearch = searchTag.trim();
+    if (trimmedSearch) {
+      newParams.set('tag', trimmedSearch);
     }
     newParams.set('page', '1');
     setSearchParams(newParams);
@@ -95,7 +94,7 @@ export function Home() {
               <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
               <Input
                 type="text"
-                placeholder="Search videos by tag or category..."
+                placeholder="Search videos by title or tag..."
                 value={searchTag}
                 onChange={(e) => setSearchTag(e.target.value)}
                 className="pl-12 pr-12 py-6 bg-transparent border-0 text-white placeholder:text-gray-500 focus-visible:ring-1 focus-visible:ring-purple-500"

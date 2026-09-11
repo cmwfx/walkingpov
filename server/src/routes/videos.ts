@@ -9,6 +9,18 @@ const DOWNLOAD_LINK_VALIDITY_SECONDS = 60 * 60;
 const mediaBaseUrl = (process.env.MEDIA_BASE_URL || 'https://media.candidfan.com').replace(/\/$/, '');
 const mediaSigningSecret = process.env.MEDIA_SIGNING_SECRET || '';
 
+const videoSelect = 'id, title, thumbnail_url, tags, is_featured, created_at, updated_at';
+
+function normalizeSearchText(value: string) {
+  return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
+}
+
+function videoMatchesSearch(video: { title: string; tags?: string[] | null }, search: string) {
+  const needle = normalizeSearchText(search);
+  if (!needle) return true;
+  return [video.title, ...(video.tags || [])].some((value) => normalizeSearchText(value).includes(needle));
+}
+
 function isUuid(value: string) {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
@@ -16,15 +28,39 @@ function isUuid(value: string) {
 router.get('/', async (req, res) => {
   const requestedPage = Number(req.query.page || 1);
   const page = Number.isInteger(requestedPage) && requestedPage > 0 ? requestedPage : 1;
-  const tag = typeof req.query.tag === 'string' ? req.query.tag.trim().slice(0, 80) : '';
+  const search = typeof req.query.search === 'string'
+    ? req.query.search.trim().slice(0, 80)
+    : typeof req.query.tag === 'string'
+      ? req.query.tag.trim().slice(0, 80)
+      : '';
+
+  if (search) {
+    const { data, error } = await supabaseAdmin
+      .from('videos')
+      .select(videoSelect)
+      .eq('status', 'ready')
+      .order('is_featured', { ascending: false })
+      .order('created_at', { ascending: false });
+    if (error) {
+      console.error('catalog-search-failed');
+      return res.status(500).json({ error: 'Unable to search the catalog' });
+    }
+
+    const matches = (data || []).filter((video) => videoMatchesSearch(video, search));
+    const start = (page - 1) * pageSize;
+    return res.json({
+      videos: matches.slice(start, start + pageSize),
+      pagination: { page, limit: pageSize, total: matches.length, totalPages: Math.max(1, Math.ceil(matches.length / pageSize)) },
+    });
+  }
+
   let query = supabaseAdmin
     .from('videos')
-    .select('id, title, thumbnail_url, tags, is_featured, created_at, updated_at', { count: 'exact' })
+    .select(videoSelect, { count: 'exact' })
     .eq('status', 'ready')
     .order('is_featured', { ascending: false })
     .order('created_at', { ascending: false })
     .range((page - 1) * pageSize, page * pageSize - 1);
-  if (tag) query = query.contains('tags', [tag]);
   const { data, error, count } = await query;
   if (error) {
     console.error('catalog-read-failed');
@@ -40,7 +76,7 @@ router.get('/:id', async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Video not found' });
   const { data, error } = await supabaseAdmin
     .from('videos')
-    .select('id, title, thumbnail_url, tags, is_featured, created_at, updated_at')
+    .select(videoSelect)
     .eq('id', req.params.id)
     .eq('status', 'ready')
     .maybeSingle();

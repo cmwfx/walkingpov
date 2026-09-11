@@ -10,6 +10,9 @@ const mediaBaseUrl = (process.env.MEDIA_BASE_URL || 'https://media.candidfan.com
 const mediaSigningSecret = process.env.MEDIA_SIGNING_SECRET || '';
 
 const videoSelect = 'id, title, thumbnail_url, tags, is_featured, created_at, updated_at';
+const searchBatchSize = 1000;
+
+type CatalogVideo = { id: string; title: string; thumbnail_url: string; tags: string[]; is_featured: boolean; created_at: string; updated_at: string };
 
 function normalizeSearchText(value: string) {
   return value.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
@@ -19,6 +22,29 @@ function videoMatchesSearch(video: { title: string; tags?: string[] | null }, se
   const needle = normalizeSearchText(search);
   if (!needle) return true;
   return [video.title, ...(video.tags || [])].some((value) => normalizeSearchText(value).includes(needle));
+}
+
+async function readCatalogForSearch() {
+  const videos: CatalogVideo[] = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from('videos')
+      .select(videoSelect)
+      .eq('status', 'ready')
+      .order('is_featured', { ascending: false })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + searchBatchSize - 1);
+    if (error) return { data: null, error };
+
+    const batch = (data || []) as CatalogVideo[];
+    videos.push(...batch);
+    if (batch.length < searchBatchSize) break;
+    offset += searchBatchSize;
+  }
+
+  return { data: videos, error: null };
 }
 
 function isUuid(value: string) {
@@ -35,12 +61,7 @@ router.get('/', async (req, res) => {
       : '';
 
   if (search) {
-    const { data, error } = await supabaseAdmin
-      .from('videos')
-      .select(videoSelect)
-      .eq('status', 'ready')
-      .order('is_featured', { ascending: false })
-      .order('created_at', { ascending: false });
+    const { data, error } = await readCatalogForSearch();
     if (error) {
       console.error('catalog-search-failed');
       return res.status(500).json({ error: 'Unable to search the catalog' });
@@ -54,7 +75,7 @@ router.get('/', async (req, res) => {
     });
   }
 
-  let query = supabaseAdmin
+  const query = supabaseAdmin
     .from('videos')
     .select(videoSelect, { count: 'exact' })
     .eq('status', 'ready')

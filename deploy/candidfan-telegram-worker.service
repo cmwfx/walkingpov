@@ -1,0 +1,19 @@
+[Unit]
+Description=CandidFan Telegram notification worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=candidfan
+WorkingDirectory=/var/www/candidfan/current
+EnvironmentFile=/etc/candidfan/api.env
+ExecStart=/usr/bin/env node /var/www/candidfan/current/server/dist/telegram-worker.js
+Restart=always
+RestartSec=5
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

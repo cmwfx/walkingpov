@@ -61,6 +61,7 @@ cd ..
 chown -R candidfan:candidfan "${release_dir}"
 install -m 0644 "${release_dir}/deploy/candidfan-api.service" /etc/systemd/system/candidfan-api.service
 install -m 0644 "${release_dir}/deploy/candidfan-email-worker.service" /etc/systemd/system/candidfan-email-worker.service
+install -m 0644 "${release_dir}/deploy/candidfan-telegram-worker.service" /etc/systemd/system/candidfan-telegram-worker.service
 install -m 0644 "${release_dir}/nginx.conf" /etc/nginx/sites-available/candidfan
 ln -sfn /etc/nginx/sites-available/candidfan /etc/nginx/sites-enabled/candidfan
 ln -sfn "${release_dir}" /var/www/candidfan/current
@@ -72,7 +73,7 @@ fi
 
 nginx -t
 systemctl daemon-reload
-systemctl enable --now nginx candidfan-api.service candidfan-email-worker.service
-systemctl restart candidfan-api.service candidfan-email-worker.service
+systemctl enable --now nginx candidfan-api.service candidfan-email-worker.service candidfan-telegram-worker.service
+systemctl restart candidfan-api.service candidfan-email-worker.service candidfan-telegram-worker.service
 
 echo "website-bootstrap-complete ${release_id}"

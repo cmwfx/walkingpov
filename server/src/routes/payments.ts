@@ -3,6 +3,7 @@ import { AuthRequest, requireAdmin, verifyToken } from '../middleware/auth.js';
 import { paymentLimiter } from '../middleware/rateLimiter.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { encrypt, decrypt, isEncrypted } from '../services/encryption.js';
+import { makePaymentReviewEmail } from '../services/paymentReviewEmail.js';
 
 const router = Router();
 
@@ -66,13 +67,42 @@ router.post('/:id/review', verifyToken, requireAdmin, async (req: AuthRequest, r
   const notes = typeof req.body?.notes === 'string' ? req.body.notes.trim().slice(0, 2000) : null;
   if (!['approved', 'denied'].includes(decision)) return res.status(400).json({ error: 'Choose approved or denied.' });
   try {
-    const { error } = await supabaseAdmin.rpc('review_payment_request', {
+    const reviewStartedAt = new Date().toISOString();
+    const { data: review, error } = await supabaseAdmin.rpc('review_payment_request', {
       p_request_id: req.params.id,
       p_admin_id: req.user!.id,
       p_decision: decision,
       p_notes: notes,
     });
     if (error) throw error;
+
+    const recipient = review?.[0]?.recipient as string | undefined;
+    if (recipient) {
+      const email = makePaymentReviewEmail(decision, notes);
+      const { data: outboxRow, error: outboxReadError } = await supabaseAdmin
+        .from('email_outbox')
+        .select('id')
+        .eq('kind', 'payment_review')
+        .eq('recipient', recipient)
+        .eq('status', 'pending')
+        .gte('created_at', reviewStartedAt)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (outboxReadError) {
+        console.error('payment-review-email-read-failed');
+      } else if (outboxRow) {
+        const { error: outboxUpdateError } = await supabaseAdmin
+          .from('email_outbox')
+          .update({ subject: email.subject, text_body: email.text, html_body: email.html })
+          .eq('id', outboxRow.id)
+          .eq('status', 'pending');
+        if (outboxUpdateError) console.error('payment-review-email-update-failed');
+      } else {
+        console.error('payment-review-email-row-not-found');
+      }
+    }
     return res.json({ message: 'Payment review saved.' });
   } catch (error) {
     const code = errorCode(error);

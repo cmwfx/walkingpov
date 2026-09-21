@@ -22,7 +22,7 @@ export function Dashboard() {
           <CardContent>
             <p className="text-lg font-semibold capitalize">{status}</p>
             <p className="mt-2 text-sm text-slate-400">{status === 'premium' ? 'Lifetime access is active. Protected downloads are available from each catalog item.' : status === 'pending' ? 'Your gift card proof is awaiting manual review.' : status === 'denied' ? 'Your last review was not approved. You can submit new proof when ready.' : 'Unlock lifetime access to download the collection.'}</p>
-            {status !== 'premium' && <Link to="/payment"><Button className="mt-5 bg-gradient-to-r from-violet-600 to-sky-600">{status === 'pending' ? 'View payment details' : 'Unlock for $30'}</Button></Link>}
+            {status !== 'premium' && <Link to="/payment"><Button className="mt-5 bg-gradient-to-r from-violet-600 to-sky-600">{status === 'pending' ? 'View payment details' : 'Unlock for €50'}</Button></Link>}
           </CardContent>
         </Card>
 

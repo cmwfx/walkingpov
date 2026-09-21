@@ -109,7 +109,7 @@ export function PaymentSubmit() {
           </div>
 
           <h1 className="text-4xl font-bold mb-2">Lifetime Premium Access</h1>
-          <p className="text-xl text-muted-foreground mb-8">One-time payment of $30</p>
+          <p className="text-xl text-muted-foreground mb-8">One-time payment of €50</p>
 
           <div className="max-w-xl mx-auto text-left mb-12">
             <PremiumBenefits className="bg-muted/30 p-6 rounded-xl border" />
@@ -120,7 +120,7 @@ export function PaymentSubmit() {
           <CardHeader>
             <CardTitle>REWARBLE VISA Gift Card Payment</CardTitle>
             <CardDescription>
-              Purchase a $30 REWARBLE VISA gift card from the link below and submit the gift card code. Pay with Paypal, Visa, Mastercard, Crypto
+              Purchase a €50 REWARBLE VISA gift card from the link below and submit the gift card code. Pay with Paypal, Visa, Mastercard, Crypto
             </CardDescription>
           </CardHeader>
           <CardContent>

@@ -288,7 +288,7 @@ export function VideoDetail() {
                           <Button className="w-full h-auto py-4 flex-col gap-1 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all shadow-lg shadow-primary/25 hover:scale-[1.02]">
                             <div className="flex items-center gap-2 font-bold text-lg">
                               <Crown className="h-5 w-5" />
-                              Get Lifetime Access - $30
+                              Get Lifetime Access - €50
                             </div>
                             <div className="flex items-center gap-2 text-xs opacity-90">
                               <span className="line-through opacity-70">€200</span>

@@ -65,6 +65,95 @@ router.get('/jobs/next', internalAuth, async (_req, res) => {
   return res.json({ job: claimed || null });
 });
 
+router.get('/previews/queue', internalAuth, async (_req, res) => {
+  const pageSize = 1000;
+  const videos: Array<{ video_id: string; storage_key: string; has_preview: boolean }> = [];
+  let offset = 0;
+
+  while (true) {
+    const { data, error } = await supabaseAdmin
+      .from('videos')
+      .select('id, is_featured, created_at, media_assets!inner(storage_key, preview_storage_key)')
+      .eq('status', 'ready')
+      .order('is_featured', { ascending: false })
+      .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
+      .range(offset, offset + pageSize - 1);
+    if (error) {
+      console.error('preview-queue-read-failed');
+      return res.status(500).json({ error: 'Unable to load preview work' });
+    }
+
+    const batch = data || [];
+    for (const row of batch) {
+      const related = row.media_assets as unknown as { storage_key: string; preview_storage_key: string | null } | Array<{ storage_key: string; preview_storage_key: string | null }>;
+      const asset = Array.isArray(related) ? related[0] : related;
+      if (!asset?.storage_key) continue;
+      videos.push({
+        video_id: row.id,
+        storage_key: asset.storage_key,
+        has_preview: asset.preview_storage_key === asset.storage_key,
+      });
+    }
+    if (batch.length < pageSize) break;
+    offset += pageSize;
+  }
+
+  return res.json({ videos, page_size: 24 });
+});
+
+router.post('/previews/:videoId/complete', internalAuth, async (req, res) => {
+  const videoId = req.params.videoId;
+  if (!isUuid(videoId)) return res.status(404).json({ error: 'video_not_found' });
+
+  const sizeBytes = req.body?.preview_size_bytes;
+  const sourceDuration = req.body?.source_duration_seconds;
+  const previewDuration = req.body?.preview_duration_seconds;
+  if (
+    !Number.isSafeInteger(sizeBytes) || sizeBytes <= 0
+    || typeof sourceDuration !== 'number' || !Number.isFinite(sourceDuration) || sourceDuration <= 0
+    || typeof previewDuration !== 'number' || !Number.isFinite(previewDuration) || previewDuration <= 0
+    || previewDuration > 10.05
+    || previewDuration > sourceDuration + 0.1
+  ) {
+    return res.status(400).json({ error: 'invalid_preview_metadata' });
+  }
+
+  const { data: asset, error: assetError } = await supabaseAdmin
+    .from('media_assets')
+    .select('storage_key, preview_storage_key')
+    .eq('video_id', videoId)
+    .maybeSingle();
+  if (assetError) {
+    console.error('preview-completion-asset-read-failed');
+    return res.status(500).json({ error: 'preview_registration_failed' });
+  }
+  if (!asset) return res.status(404).json({ error: 'video_not_found' });
+  if (asset.preview_storage_key) {
+    if (asset.preview_storage_key === asset.storage_key) return res.json({ ok: true, already_complete: true });
+    return res.status(409).json({ error: 'preview_key_conflict' });
+  }
+
+  const { data: registered, error } = await supabaseAdmin
+    .from('media_assets')
+    .update({
+      preview_storage_key: asset.storage_key,
+      preview_size_bytes: sizeBytes,
+      source_duration_seconds: sourceDuration,
+      preview_duration_seconds: previewDuration,
+    })
+    .eq('video_id', videoId)
+    .is('preview_storage_key', null)
+    .select('video_id')
+    .maybeSingle();
+  if (error) {
+    console.error('preview-completion-write-failed');
+    return res.status(500).json({ error: 'preview_registration_failed' });
+  }
+  if (!registered) return res.status(409).json({ error: 'preview_registration_conflict' });
+  return res.json({ ok: true, already_complete: false });
+});
+
 router.post('/jobs/:id/scan', internalAuth, async (req, res) => {
   if (!isUuid(req.params.id)) return res.status(404).json({ error: 'import_job_not_found' });
   const totalItems = Number.isSafeInteger(req.body?.total_items) ? req.body.total_items : 0;

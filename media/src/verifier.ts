@@ -13,8 +13,11 @@ const defaultCorsOrigins = [
   'https://www.candidfan.com',
 ];
 
-function signatureFor(key: string, expires: number, signingSecret: string) {
-  return crypto.createHmac('sha256', signingSecret).update(`${key}.${expires}`).digest('hex');
+type MediaPurpose = 'download' | 'preview';
+
+function signatureFor(key: string, expires: number, signingSecret: string, purpose: MediaPurpose = 'download') {
+  const payload = purpose === 'preview' ? `preview.${key}.${expires}` : `${key}.${expires}`;
+  return crypto.createHmac('sha256', signingSecret).update(payload).digest('hex');
 }
 
 export function verifyRequest(
@@ -23,11 +26,12 @@ export function verifyRequest(
   provided: string,
   now = Math.floor(Date.now() / 1000),
   signingSecret = process.env.MEDIA_SIGNING_SECRET || '',
+  purpose: MediaPurpose = 'download',
 ) {
   if (!signingSecret || !uuidPattern.test(key) || !/^\d{10}$/.test(expiresText) || !/^[0-9a-f]{64}$/i.test(provided)) return false;
   const expires = Number(expiresText);
   if (!Number.isSafeInteger(expires) || expires < now || expires > now + MAX_MEDIA_LINK_VALIDITY_SECONDS) return false;
-  const expected = signatureFor(key, expires, signingSecret);
+  const expected = signatureFor(key, expires, signingSecret, purpose);
   return crypto.timingSafeEqual(Buffer.from(expected, 'hex'), Buffer.from(provided, 'hex'));
 }
 
@@ -54,6 +58,7 @@ async function readBody(req: IncomingMessage) {
 
 export type MediaHandlerOptions = {
   mediaRoot?: string;
+  previewRoot?: string;
   thumbnailRoot?: string;
   signingSecret: string;
   allowedOrigins?: readonly string[];
@@ -62,6 +67,7 @@ export type MediaHandlerOptions = {
 
 type ConfiguredMediaOptions = {
   mediaRoot: string;
+  previewRoot: string;
   thumbnailRoot: string;
   signingSecret: string;
   allowedOrigins: Set<string>;
@@ -126,17 +132,20 @@ async function handle(req: IncomingMessage, res: ServerResponse, options: Config
     }
   }
 
-  const match = requestUrl.pathname.match(/^\/verify\/([^/]+)$/);
-  if (!match) return send(res, 404);
+  const previewMatch = requestUrl.pathname.match(/^\/verify-preview\/([^/]+)$/);
+  const downloadMatch = requestUrl.pathname.match(/^\/verify\/([^/]+)$/);
+  const pathMatch = previewMatch ?? downloadMatch;
+  if (!pathMatch) return send(res, 404);
+  const purpose: MediaPurpose = previewMatch ? 'preview' : 'download';
   let key: string;
   try {
-    key = decodeURIComponent(match[1]);
+    key = decodeURIComponent(pathMatch[1]);
   } catch {
     return send(res, 404);
   }
   const expires = requestUrl.searchParams.get('expires') || '';
   const signature = requestUrl.searchParams.get('sig') || '';
-  if (!verifyRequest(key, expires, signature, options.now(), options.signingSecret)) return send(res, 403);
+  if (!verifyRequest(key, expires, signature, options.now(), options.signingSecret, purpose)) return send(res, 403);
 
   if (req.method === 'OPTIONS') {
     const origin = String(req.headers.origin || '');
@@ -162,17 +171,19 @@ async function handle(req: IncomingMessage, res: ServerResponse, options: Config
   }
   if (req.method !== 'GET' && req.method !== 'HEAD') return send(res, 405);
 
-  const mediaPath = path.join(options.mediaRoot, `${key}.mp4`);
+  const mediaPath = path.join(purpose === 'preview' ? options.previewRoot : options.mediaRoot, `${key}.mp4`);
   try {
     const details = await stat(mediaPath);
     if (!details.isFile()) return send(res, 404);
+    const internalLocation = purpose === 'preview' ? '__candidfan_previews__' : '__candidfan_media';
+    const filenamePrefix = purpose === 'preview' ? 'preview' : 'download';
     res.writeHead(200, {
       'Content-Type': 'video/mp4',
       'Content-Length': String(details.size),
-      'Content-Disposition': `attachment; filename="download-${key}.mp4"`,
+      'Content-Disposition': `${purpose === 'preview' ? 'inline' : 'attachment'}; filename="${filenamePrefix}-${key}.mp4"`,
       'Cache-Control': 'private, no-store',
       'Accept-Ranges': 'bytes',
-      'X-Accel-Redirect': `/__candidfan_media/${key}.mp4`,
+      'X-Accel-Redirect': `/${internalLocation}/${key}.mp4`,
     });
     if (req.method === 'HEAD') return res.end();
     return res.end();
@@ -185,6 +196,7 @@ export function createMediaHandler(input: MediaHandlerOptions) {
   if (!input.signingSecret) throw new Error('MEDIA_SIGNING_SECRET is required');
   const options = {
     mediaRoot: path.resolve(input.mediaRoot || '/srv/candidfan/media'),
+    previewRoot: path.resolve(input.previewRoot || '/srv/candidfan/previews'),
     thumbnailRoot: path.resolve(input.thumbnailRoot || '/srv/candidfan/thumbnails'),
     signingSecret: input.signingSecret,
     allowedOrigins: normalizeCorsOrigins(input.allowedOrigins || defaultCorsOrigins),
@@ -199,6 +211,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.ar
   const server = createServer(
     createMediaHandler({
       mediaRoot: process.env.MEDIA_ROOT,
+      previewRoot: process.env.PREVIEW_ROOT,
       thumbnailRoot: process.env.THUMBNAIL_ROOT,
       signingSecret: process.env.MEDIA_SIGNING_SECRET || '',
       allowedOrigins: (process.env.CORS_ORIGINS || defaultCorsOrigins.join(','))

@@ -15,6 +15,7 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectHome=true
 ReadWritePaths=/srv/candidfan/state /srv/candidfan/thumbnails
+ReadOnlyPaths=/srv/candidfan/media /srv/candidfan/previews
 
 [Install]
 WantedBy=multi-user.target

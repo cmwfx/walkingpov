@@ -11,6 +11,7 @@ import { createMediaHandler } from './verifier.js';
 const signingSecret = 'synthetic-media-signing-secret-0123456789abcdef';
 const now = 1_800_000_000;
 const videoId = '123e4567-e89b-42d3-a456-426614174000';
+const missingPreviewVideoId = '123e4567-e89b-42d3-a456-426614174001';
 const expires = String(now + 300);
 const origin = 'https://candidfan.com';
 let root = '';
@@ -24,16 +25,28 @@ function signedUrl() {
   return `${baseUrl}/verify/${videoId}?expires=${expires}&sig=${signature}`;
 }
 
+function signedPreviewUrl(key = videoId) {
+  const signature = createHmac('sha256', signingSecret)
+    .update(`preview.${key}.${expires}`)
+    .digest('hex');
+  return `${baseUrl}/verify-preview/${key}?expires=${expires}&sig=${signature}`;
+}
+
 before(async () => {
   root = await mkdtemp(path.join(os.tmpdir(), 'candidfan-media-test-'));
   const mediaRoot = path.join(root, 'media');
+  const previewRoot = path.join(root, 'previews');
   const thumbnailRoot = path.join(root, 'thumbnails');
   await mkdir(mediaRoot);
+  await mkdir(previewRoot);
   await mkdir(thumbnailRoot);
   await writeFile(path.join(mediaRoot, `${videoId}.mp4`), Buffer.from([1, 2, 3]));
+  await writeFile(path.join(mediaRoot, `${missingPreviewVideoId}.mp4`), Buffer.from([4, 5, 6]));
+  await writeFile(path.join(previewRoot, `${videoId}.mp4`), Buffer.from([7, 8]));
   server = createServer(
     createMediaHandler({
       mediaRoot,
+      previewRoot,
       thumbnailRoot,
       signingSecret,
       allowedOrigins: [origin],
@@ -115,5 +128,36 @@ describe('signed media access and CORS preflight', () => {
     assert.equal(response.headers.get('content-length'), '3');
     assert.equal(response.headers.get('accept-ranges'), 'bytes');
     assert.equal(response.headers.get('x-accel-redirect'), `/__candidfan_media/${videoId}.mp4`);
+    assert.match(response.headers.get('content-disposition') || '', /^attachment;/);
+  });
+
+  it('serves only the isolated preview asset with a purpose-bound signature', async () => {
+    const response = await fetch(signedPreviewUrl(), { method: 'HEAD', headers: { Origin: origin } });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'video/mp4');
+    assert.equal(response.headers.get('content-length'), '2');
+    assert.equal(response.headers.get('accept-ranges'), 'bytes');
+    assert.equal(response.headers.get('x-accel-redirect'), `/__candidfan_previews__/${videoId}.mp4`);
+    assert.match(response.headers.get('content-disposition') || '', /^inline;/);
+
+    const previewSignatureOnDownloadRoute = await fetch(signedPreviewUrl().replace('/verify-preview/', '/verify/'), { method: 'HEAD' });
+    assert.equal(previewSignatureOnDownloadRoute.status, 403);
+
+    const missingPreview = await fetch(signedPreviewUrl(missingPreviewVideoId), { method: 'HEAD' });
+    assert.equal(missingPreview.status, 404);
+  });
+
+  it('allows exact-origin range preflight for a signed preview', async () => {
+    const response = await fetch(signedPreviewUrl(), {
+      method: 'OPTIONS',
+      headers: {
+        Origin: origin,
+        'Access-Control-Request-Method': 'GET',
+        'Access-Control-Request-Headers': 'range',
+      },
+    });
+    assert.equal(response.status, 204);
+    assert.equal(response.headers.get('access-control-allow-origin'), origin);
+    assert.equal(response.headers.get('access-control-allow-headers'), 'Range, If-Range');
   });
 });

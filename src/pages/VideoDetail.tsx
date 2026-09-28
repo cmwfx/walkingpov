@@ -1,8 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import type { Video } from '@/lib/supabase';
-import { getDownloadUrl, getVideo, updateVideoThumbnail } from '@/lib/api';
+import type { Video, VideoPreview } from '@/lib/supabase';
+import { getDownloadUrl, getVideo, getVideoPreview, updateVideoThumbnail } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
@@ -10,12 +10,15 @@ import { PremiumBenefits } from '@/components/PremiumBenefits';
 import { DiscountTimer } from '@/components/DiscountTimer';
 import { Download, Lock, Tag, Crown, ArrowLeft, ImagePlus, Sparkles } from 'lucide-react';
 import { getResponsiveImageUrls, generateSrcSet, getPrimaryImageUrl } from '@/lib/imageUtils';
+import { VideoPreviewPlayer } from '@/components/VideoPreviewPlayer';
 
 type DownloadLink = { id: string; label: string; url: string };
 
 export function VideoDetail() {
   const { id } = useParams<{ id: string }>();
+  const currentVideoId = useRef<string | null>(id || null);
   const [video, setVideo] = useState<Video | null>(null);
+  const [preview, setPreview] = useState<VideoPreview | null>(null);
   const [loading, setLoading] = useState(true);
   const [downloadLinks, setDownloadLinks] = useState<DownloadLink[]>([]);
   const [linksLoading, setLinksLoading] = useState(false);
@@ -28,26 +31,46 @@ export function VideoDetail() {
   const canAccessDownloads = isPremium || isAdmin;
 
   useEffect(() => {
+    currentVideoId.current = id || null;
     if (id) {
-      fetchVideo();
-      if (canAccessDownloads) fetchDownloadLinks();
+      fetchVideo(id);
+      setDownloadLinks([]);
+      setLinksLoading(false);
+      if (canAccessDownloads) fetchDownloadLinks(id);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, canAccessDownloads]);
 
-  const fetchVideo = async () => {
+  useEffect(() => {
+    setPreview(null);
+    if (!id) return;
+    let active = true;
+    getVideoPreview(id).then((data) => {
+      if (active) setPreview(data);
+    }).catch(() => {
+      if (active) setPreview(null);
+    });
+    return () => { active = false; };
+  }, [id]);
+
+  const fetchVideo = async (videoId: string) => {
     setLoading(true);
     try {
-      const data = await getVideo(id!);
-      setVideo(data);
+      const data = await getVideo(videoId);
+      if (currentVideoId.current === videoId) {
+        setVideo(data);
+        setImageLoaded(false);
+      }
     } catch {
-      toast({
-        title: 'Error',
-        description: 'Failed to load video',
-        variant: 'destructive',
-      });
+      if (currentVideoId.current === videoId) {
+        toast({
+          title: 'Error',
+          description: 'Failed to load video',
+          variant: 'destructive',
+        });
+      }
     } finally {
-      setLoading(false);
+      if (currentVideoId.current === videoId) setLoading(false);
     }
   };
 
@@ -70,20 +93,19 @@ export function VideoDetail() {
     }
   };
 
-  const fetchDownloadLinks = async () => {
-    if (!id) return;
+  const fetchDownloadLinks = async (videoId: string) => {
     setLinksLoading(true);
     try {
-      const { url } = await getDownloadUrl(id);
-      setDownloadLinks([{ id: 'download', label: 'Download MP4', url }]);
+      const { url } = await getDownloadUrl(videoId);
+      if (currentVideoId.current === videoId) setDownloadLinks([{ id: 'download', label: 'Download MP4', url }]);
     } catch (error) {
-      console.error('Error fetching download links:', error);
+      if (currentVideoId.current === videoId) console.error('Error fetching download links:', error);
     } finally {
-      setLinksLoading(false);
+      if (currentVideoId.current === videoId) setLinksLoading(false);
     }
   };
 
-  if (loading) {
+  if (loading || (id && video?.id !== id)) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -116,6 +138,16 @@ export function VideoDetail() {
           {/* Main Content */}
           <div className="lg:col-span-2 space-y-6">
             <Card>
+              {preview ? (
+                <VideoPreviewPlayer
+                  key={preview.url}
+                  preview={preview}
+                  title={video.title}
+                  canDownload={canAccessDownloads}
+                  premiumActionHref={isAuthenticated ? '/payment' : '/signup'}
+                  downloadUrl={downloadLinks[0]?.url}
+                />
+              ) : (
               <div className="aspect-video relative overflow-hidden bg-muted rounded-t-xl">
                 {/* Blur placeholder */}
                 {!imageLoaded && (
@@ -162,6 +194,7 @@ export function VideoDetail() {
                   );
                 })()}
               </div>
+              )}
               <CardHeader>
                 <CardTitle className="text-2xl md:text-3xl">{video.title}</CardTitle>
               </CardHeader>

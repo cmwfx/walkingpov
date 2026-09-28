@@ -40,6 +40,7 @@ async function request<T>(pathname: string, init: RequestInit = {}, authenticate
 export const getMe = () => request<{ user: import('./supabase').User }>('/api/me', {}, true);
 export const getVideos = (page = 1, tag = '') => request<{ videos: import('./supabase').Video[]; pagination: { page: number; total: number; totalPages: number } }>(`/api/videos?page=${page}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`);
 export const getVideo = (id: string) => request<import('./supabase').Video>(`/api/videos/${encodeURIComponent(id)}`);
+export const getVideoPreview = (id: string) => request<import('./supabase').VideoPreview>(`/api/videos/${encodeURIComponent(id)}/preview`);
 export const getDownloadUrl = (id: string) => request<{ url: string; expires_at: string }>(`/api/videos/${encodeURIComponent(id)}/download`, {}, true);
 export async function updateVideoThumbnail(id: string, file: File) {
   const form = new FormData();

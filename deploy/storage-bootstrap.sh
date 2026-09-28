@@ -27,8 +27,10 @@ id -u candidfan-media >/dev/null 2>&1 || useradd --system --home-dir /opt/candid
 usermod --append --groups www-data candidfan-media
 usermod --append --groups candidfan-media www-data
 install -d -m 0755 /opt/candidfan-media /opt/candidfan-importer
+install -d -m 0755 /opt/candidfan-tools
 install -d -m 0755 /srv/candidfan
 install -d -m 0750 -o root -g www-data /srv/candidfan/media
+install -d -m 2770 -o candidfan-media -g candidfan-media /srv/candidfan/previews
 install -d -m 0770 -o root -g candidfan-media /srv/candidfan/thumbnails
 install -d -m 0750 -o root -g root /srv/candidfan/intake
 install -d -m 0750 -o root -g candidfan-media /srv/candidfan/state
@@ -42,6 +44,7 @@ if [[ ! -s /etc/candidfan/media.env ]]; then
 NODE_ENV=production
 PORT=3100
 MEDIA_ROOT=/srv/candidfan/media
+PREVIEW_ROOT=/srv/candidfan/previews
 MEDIA_SIGNING_SECRET=${media_signing_secret}
 CORS_ORIGINS=https://candidfan.com,https://www.candidfan.com
 EOF
@@ -52,7 +55,9 @@ else
 fi
 
 sed -i -e '/^INSTANTVIDGRAB_CORS_ORIGINS=/d' -e '/^CORS_ORIGINS=/d' /etc/candidfan/media.env
+sed -i '/^PREVIEW_ROOT=/d' /etc/candidfan/media.env
 printf '\nCORS_ORIGINS=https://candidfan.com,https://www.candidfan.com\n' >> /etc/candidfan/media.env
+printf 'PREVIEW_ROOT=/srv/candidfan/previews\n' >> /etc/candidfan/media.env
 
 if [[ -z "${media_signing_secret}" ]]; then
   echo 'storage-bootstrap-missing-media-secret' >&2
@@ -90,6 +95,8 @@ cp -a dist /opt/candidfan-importer/dist
 
 install -m 0644 "${repo_dir}/deploy/candidfan-media-verifier.service" /etc/systemd/system/candidfan-media-verifier.service
 install -m 0644 "${repo_dir}/deploy/candidfan-importer.service" /etc/systemd/system/candidfan-importer.service
+install -m 0755 "${repo_dir}/deploy/generate-video-previews.sh" /opt/candidfan-tools/generate-video-previews.sh
+install -m 0644 "${repo_dir}/deploy/candidfan-preview-backfill.service" /etc/systemd/system/candidfan-preview-backfill.service
 install -m 0644 "${repo_dir}/media/nginx.conf" /etc/nginx/sites-available/candidfan-media
 ln -sfn /etc/nginx/sites-available/candidfan-media /etc/nginx/sites-enabled/candidfan-media
 

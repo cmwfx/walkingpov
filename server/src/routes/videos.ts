@@ -1,11 +1,12 @@
 import { Router } from 'express';
 import { supabaseAdmin } from '../config/supabase.js';
 import { AuthRequest, verifyToken } from '../middleware/auth.js';
-import { signMediaKey } from '../services/mediaSignature.js';
+import { signMediaKey, signPreviewKey } from '../services/mediaSignature.js';
 
 const router = Router();
 const pageSize = 24;
 const DOWNLOAD_LINK_VALIDITY_SECONDS = 60 * 60;
+const PREVIEW_LINK_VALIDITY_SECONDS = 60 * 60;
 const mediaBaseUrl = (process.env.MEDIA_BASE_URL || 'https://media.candidfan.com').replace(/\/$/, '');
 const mediaSigningSecret = process.env.MEDIA_SIGNING_SECRET || '';
 
@@ -35,6 +36,7 @@ async function readCatalogForSearch() {
       .eq('status', 'ready')
       .order('is_featured', { ascending: false })
       .order('created_at', { ascending: false })
+      .order('id', { ascending: true })
       .range(offset, offset + searchBatchSize - 1);
     if (error) return { data: null, error };
 
@@ -81,6 +83,7 @@ router.get('/', async (req, res) => {
     .eq('status', 'ready')
     .order('is_featured', { ascending: false })
     .order('created_at', { ascending: false })
+    .order('id', { ascending: true })
     .range((page - 1) * pageSize, page * pageSize - 1);
   const { data, error, count } = await query;
   if (error) {
@@ -107,6 +110,47 @@ router.get('/:id', async (req, res) => {
   }
   if (!data) return res.status(404).json({ error: 'Video not found' });
   return res.json(data);
+});
+
+router.get('/:id/preview', async (req, res) => {
+  if (!isUuid(req.params.id)) return res.status(404).json({ error: 'Video not found' });
+  if (!mediaSigningSecret) return res.status(503).json({ error: 'Previews are temporarily unavailable' });
+  const { data: video, error: videoError } = await supabaseAdmin
+    .from('videos')
+    .select('id')
+    .eq('id', req.params.id)
+    .eq('status', 'ready')
+    .maybeSingle();
+  if (videoError) {
+    console.error('video-preview-status-read-failed');
+    return res.status(500).json({ error: 'Unable to load the video preview' });
+  }
+  if (!video) return res.status(404).json({ error: 'Video not found' });
+
+  const { data: asset, error } = await supabaseAdmin
+    .from('media_assets')
+    .select('storage_key, preview_storage_key, source_duration_seconds, preview_duration_seconds')
+    .eq('video_id', req.params.id)
+    .maybeSingle();
+  if (error) {
+    console.error('video-preview-asset-read-failed');
+    return res.status(500).json({ error: 'Unable to load the video preview' });
+  }
+  if (!asset?.preview_storage_key || asset.preview_storage_key !== asset.storage_key) {
+    return res.status(404).json({ error: 'Preview not available yet' });
+  }
+
+  const expires = Math.floor(Date.now() / 1000) + PREVIEW_LINK_VALIDITY_SECONDS;
+  const previewKey = String(asset.preview_storage_key);
+  const signature = signPreviewKey(previewKey, expires, mediaSigningSecret);
+  const url = `${mediaBaseUrl}/preview/${encodeURIComponent(previewKey)}?expires=${expires}&sig=${signature}`;
+  res.set('Cache-Control', 'private, no-store');
+  return res.json({
+    url,
+    sourceDurationSeconds: Number(asset.source_duration_seconds),
+    previewDurationSeconds: Number(asset.preview_duration_seconds),
+    expiresAt: new Date(expires * 1000).toISOString(),
+  });
 });
 
 router.get('/:id/download', verifyToken, async (req: AuthRequest, res) => {

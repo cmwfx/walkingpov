@@ -5,6 +5,7 @@ umask 0027
 media_root="${MEDIA_ROOT:-/srv/candidfan/media}"
 preview_root="${PREVIEW_ROOT:-/srv/candidfan/previews}"
 minimum_free_bytes="${MINIMUM_FREE_BYTES:-10737418240}" # Keep at least 10 GiB free.
+max_previews="${MAX_PREVIEWS:-0}" # Zero means no per-run cap.
 site_url="${WEBSITE_INTERNAL_URL:-https://candidfan.com}"
 importer_token="${IMPORTER_TOKEN:-}"
 
@@ -14,6 +15,7 @@ done
 [[ -d "$media_root" && -r "$media_root" ]] || { echo 'Original media directory is unavailable.' >&2; exit 1; }
 [[ -d "$preview_root" && -w "$preview_root" ]] || { echo 'Preview directory is unavailable or not writable.' >&2; exit 1; }
 [[ "$minimum_free_bytes" =~ ^[0-9]+$ ]] || { echo 'MINIMUM_FREE_BYTES must be an integer.' >&2; exit 1; }
+[[ "$max_previews" =~ ^[0-9]+$ ]] || { echo 'MAX_PREVIEWS must be a non-negative integer.' >&2; exit 1; }
 [[ -n "$importer_token" ]] || { echo 'IMPORTER_TOKEN is required.' >&2; exit 1; }
 api_base="${site_url%/}"
 uuid_re='^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
@@ -83,10 +85,15 @@ already_done=0
 failed=0
 index=0
 space_stop=0
-printf 'preview_backfill_start page_one_priority=%s minimum_free_bytes=%s\n' "$page_size" "$minimum_free_bytes"
+limit_stop=0
+printf 'preview_backfill_start page_one_priority=%s minimum_free_bytes=%s max_previews=%s\n' "$page_size" "$minimum_free_bytes" "$max_previews"
 
 while IFS=$'\t' read -r video_id storage_key has_preview; do
   [[ -n "$video_id" ]] || continue
+  if (( max_previews > 0 && processed >= max_previews )); then
+    limit_stop=1
+    break
+  fi
   index=$((index + 1))
   total=$((total + 1))
   if [[ "$has_preview" == true ]]; then
@@ -198,5 +205,5 @@ while IFS=$'\t' read -r video_id storage_key has_preview; do
   printf 'preview_complete item=%s preview_duration_seconds=%s size_bytes=%s free_bytes=%s\n' "$index" "$preview_duration" "$output_size" "$(free_bytes)"
 done < "$items_file"
 
-printf 'preview_backfill_finish catalog_items=%s new_previews=%s existing_previews=%s skipped=%s stopped_for_reserve=%s free_bytes=%s\n' \
-  "$total" "$processed" "$already_done" "$failed" "$space_stop" "$(free_bytes)"
+printf 'preview_backfill_finish catalog_items=%s new_previews=%s existing_previews=%s skipped=%s stopped_for_reserve=%s stopped_for_limit=%s free_bytes=%s\n' \
+  "$total" "$processed" "$already_done" "$failed" "$space_stop" "$limit_stop" "$(free_bytes)"

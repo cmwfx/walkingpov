@@ -49,7 +49,7 @@ export function Login() {
           title: 'Welcome back!',
           description: 'Successfully logged in.',
         });
-        navigate('/dashboard');
+        navigate('/dashboard', { replace: true });
       }
     } catch {
       toast({

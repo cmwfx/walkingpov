@@ -3,6 +3,13 @@ import { API_URL } from './utils';
 
 let csrfToken: string | null = null;
 
+export class ApiRequestError extends Error {
+  constructor(readonly status: number, message: string) {
+    super(message);
+    this.name = 'ApiRequestError';
+  }
+}
+
 async function getCsrfToken() {
   if (csrfToken) return csrfToken;
   const response = await fetch(`${API_URL}/api/csrf-token`, { credentials: 'include' });
@@ -26,7 +33,7 @@ async function request<T>(pathname: string, init: RequestInit = {}, authenticate
   const headers = { ...(init.headers || {}), ...(authenticated ? await authHeaders(mutate) : mutate ? { 'Content-Type': 'application/json', 'X-CSRF-Token': await getCsrfToken() } : {}) };
   const response = await fetch(`${API_URL}${pathname}`, { ...init, headers, credentials: 'include' });
   const body = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(body.error || 'Request failed.');
+  if (!response.ok) throw new ApiRequestError(response.status, body.error || 'Request failed.');
   return body as T;
 }
 

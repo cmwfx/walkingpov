@@ -13,6 +13,7 @@ import payments from './routes/payments.js';
 import support from './routes/support.js';
 import imports from './routes/imports.js';
 import admin from './routes/admin.js';
+import instantvidgrab from './routes/instantvidgrab.js';
 import { supabaseAdmin } from './config/supabase.js';
 
 const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
@@ -54,7 +55,12 @@ export function createApp() {
   }));
   app.use(cors({ origin: frontendUrl, credentials: true, methods: ['GET', 'HEAD', 'POST', 'PATCH'] }));
   app.use(compression());
-  app.use(express.json({ limit: '64kb' }));
+  app.use(express.json({
+    limit: '64kb',
+    verify: (request, _response, body) => {
+      (request as Request & { rawBody?: Buffer }).rawBody = body;
+    },
+  }));
   app.use(cookieParser());
 
   app.get(['/health', '/api/health'], async (_req, res) => {
@@ -77,6 +83,7 @@ export function createApp() {
   app.use('/api', verifyCsrfToken);
 
   app.get('/api/me', verifyToken, (req: AuthRequest, res) => res.json({ user: req.user }));
+  app.use('/api/integrations/instantvidgrab', instantvidgrab);
   app.use('/api/videos', videos);
   app.use('/api/payments', payments);
   app.use('/api/support', support);

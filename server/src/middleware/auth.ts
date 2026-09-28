@@ -6,6 +6,7 @@ export type MembershipStatus = 'free' | 'pending' | 'premium' | 'denied';
 export interface AuthUser {
   id: string;
   email: string;
+  email_verified: boolean;
   is_admin: boolean;
   membership_status: MembershipStatus;
 }
@@ -32,7 +33,10 @@ export async function verifyToken(req: AuthRequest, res: Response, next: NextFun
       .maybeSingle();
 
     if (profileError || !profile) return res.status(401).json({ error: 'Account profile unavailable' });
-    req.user = profile as AuthUser;
+    req.user = {
+      ...(profile as Omit<AuthUser, 'email_verified'>),
+      email_verified: Boolean(data.user.email_confirmed_at),
+    };
     return next();
   } catch {
     console.error('auth-middleware-failed');

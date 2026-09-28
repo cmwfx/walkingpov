@@ -1,6 +1,6 @@
-import { useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
+import { useState, type FormEvent } from 'react';
 import { PremiumBenefits } from '@/components/PremiumBenefits';
 import { DiscountTimer } from '@/components/DiscountTimer';
 import { Button } from '@/components/ui/button';
@@ -8,36 +8,31 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { GIFT_CARD_LINK, CONTACT_INFO } from '@/lib/utils';
+import { CONTACT_INFO, GIFT_CARD_LINK } from '@/lib/utils';
 import { submitPayment } from '@/lib/api';
-import { ExternalLink, CreditCard, CheckCircle, Sparkles } from 'lucide-react';
+import { CheckCircle, CreditCard, ExternalLink, Sparkles } from 'lucide-react';
 
 export function PaymentSubmit() {
   const [proof, setProof] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const { user, refreshUser } = useAuth();
-  const navigate = useNavigate();
   const { toast } = useToast();
+  const hasPendingLegacyReview = user?.membership_status === 'pending';
+  const isAlreadyPremium = user?.membership_status === 'premium';
 
-  const handleSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
     setLoading(true);
-
     try {
       await submitPayment(proof.trim());
       await refreshUser();
       setSubmitted(true);
-
+      toast({ title: 'Payment submitted!', description: 'Your payment is under review. We will contact you soon.' });
+    } catch (error) {
       toast({
-        title: 'Payment submitted!',
-        description: 'Your payment is under review. We will contact you soon.',
-      });
-
-    } catch (err) {
-      toast({
-        title: 'Error',
-        description: err instanceof Error ? err.message : 'Failed to submit payment. Please try again.',
+        title: 'Unable to submit payment',
+        description: error instanceof Error ? error.message : 'Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -45,48 +40,31 @@ export function PaymentSubmit() {
     }
   };
 
-  if (user?.membership_status === 'pending' || submitted) {
+  if (hasPendingLegacyReview || submitted) {
     return (
       <div className="container mx-auto px-4 py-16">
-        <Card className="max-w-2xl mx-auto">
+        <Card className="mx-auto max-w-2xl">
           <CardHeader className="text-center">
-            <div className="flex justify-center mb-4">
-              <div className="p-4 rounded-full bg-yellow-100 dark:bg-yellow-900">
-                <CheckCircle className="h-12 w-12 text-yellow-600" />
-              </div>
-            </div>
+            <div className="mb-4 flex justify-center"><div className="rounded-full bg-yellow-100 p-4 dark:bg-yellow-900"><CheckCircle className="size-12 text-yellow-600" /></div></div>
             <CardTitle className="text-2xl">Payment Under Review</CardTitle>
-            <CardDescription>
-              Thank you for your submission! Your payment is being verified.
-            </CardDescription>
+            <CardDescription>{submitted ? 'Thank you for your submission. Your payment is being verified.' : 'Your earlier gift-card submission is still being reviewed. You do not need to submit it again.'}</CardDescription>
+          </CardHeader>
+          <CardContent><Button asChild className="w-full"><Link to="/dashboard">Go to Dashboard</Link></Button></CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (isAlreadyPremium) {
+    return (
+      <div className="container mx-auto px-4 py-16">
+        <Card className="mx-auto max-w-2xl">
+          <CardHeader>
+            <CardTitle className="text-2xl">Your CandidFan Premium is active</CardTitle>
+            <CardDescription>Your existing CandidFan access is preserved. We won’t ask you to pay again here.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="bg-muted p-4 rounded-lg space-y-2">
-              <h3 className="font-semibold">Contact Information:</h3>
-              <div className="space-y-1 text-sm">
-                <p>
-                  <span className="font-medium">Support:</span>{' '}
-                  <Link to="/support" className="text-primary hover:underline">
-                    Open support page
-                  </Link>
-                </p>
-                <p>
-                  <span className="font-medium">Email:</span>{' '}
-                  <a href={`mailto:${CONTACT_INFO.email}`} className="text-primary hover:underline">
-                    {CONTACT_INFO.email}
-                  </a>
-                </p>
-                <p>
-                  <span className="font-medium">Review Time:</span> {CONTACT_INFO.reviewTime}
-                </p>
-                <p className="pt-2 text-muted-foreground">
-                  You will receive an email when your payment review is complete. There is no need to contact support if it has been less than 12 hours.
-                </p>
-              </div>
-            </div>
-            <Button onClick={() => navigate('/dashboard')} className="w-full">
-              Go to Dashboard
-            </Button>
+            <Button asChild variant="outline" className="w-full"><Link to="/dashboard">Return to Dashboard</Link></Button>
           </CardContent>
         </Card>
       </div>
@@ -95,44 +73,24 @@ export function PaymentSubmit() {
 
   return (
     <div className="container mx-auto px-4 py-16">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center p-3 rounded-xl bg-primary/10 mb-6 border border-primary/20 backdrop-blur-sm animate-pulse">
-            <div className="flex items-center gap-2 mr-3">
-              <Sparkles className="h-5 w-5 text-yellow-500" />
-              <span className="font-bold text-base bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-600">Celebrating 10k Members!</span>
-            </div>
-            <div className="flex items-center gap-2 border-l border-primary/20 pl-3">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Offer Ends In</span>
-              <DiscountTimer />
-            </div>
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-8 text-center">
+          <div className="mb-5 inline-flex items-center gap-2 rounded-xl border border-primary/20 bg-primary/10 px-4 py-3 text-sm text-primary">
+            <Sparkles className="size-4 text-yellow-500" /> Celebrating 10k Members! <span className="border-l border-primary/20 pl-3">Offer ends in <DiscountTimer /></span>
           </div>
-
-          <h1 className="text-4xl font-bold mb-2">Lifetime Premium Access</h1>
-          <p className="text-xl text-muted-foreground mb-8">One-time payment of €50</p>
-
-          <div className="max-w-xl mx-auto text-left mb-12">
-            <PremiumBenefits className="bg-muted/30 p-6 rounded-xl border" />
-          </div>
+          <h1 className="mb-3 text-4xl font-bold">Lifetime Premium Access</h1>
+          <p className="mb-8 text-xl text-muted-foreground">One-time payment of €50</p>
+          <div className="mx-auto mb-12 max-w-xl text-left"><PremiumBenefits className="rounded-xl border bg-muted/30 p-6" /></div>
         </div>
 
         <Card className="mb-8">
           <CardHeader>
             <CardTitle>REWARBLE VISA Gift Card Payment</CardTitle>
-            <CardDescription>
-              Purchase a €50 REWARBLE VISA gift card from the link below and submit the gift card code. Pay with Paypal, Visa, Mastercard, Crypto
-            </CardDescription>
+            <CardDescription>Purchase a €50 REWARBLE VISA gift card from the link below and submit its code. The retailer accepts PayPal, Visa, Mastercard, and other payment methods.</CardDescription>
           </CardHeader>
           <CardContent>
-            <a
-              href={GIFT_CARD_LINK}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 p-4 bg-primary text-primary-foreground rounded-lg hover:bg-primary/90 transition-colors"
-            >
-              <CreditCard className="h-5 w-5" />
-              Purchase REWARBLE VISA Gift Card
-              <ExternalLink className="h-4 w-4" />
+            <a href={GIFT_CARD_LINK} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg bg-primary p-4 text-primary-foreground transition-colors hover:bg-primary/90">
+              <CreditCard className="size-5" /> Purchase REWARBLE VISA Gift Card <ExternalLink className="size-4" />
             </a>
           </CardContent>
         </Card>
@@ -140,35 +98,21 @@ export function PaymentSubmit() {
         <Card>
           <CardHeader>
             <CardTitle>Gift Card Code</CardTitle>
-            <CardDescription>
-              Your code looks like PY4NW2H7EWKZKTS5 with letters and numbers
-            </CardDescription>
+            <CardDescription>Your code looks like PY4NW2H7EWKZKTS5 with letters and numbers.</CardDescription>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="proof">
-                  Gift Card Code
-                </Label>
-                <Input
-                  id="proof"
-                  placeholder="PY4NW2H7EWKZKTS5"
-                  value={proof}
-                  onChange={(e) => setProof(e.target.value)}
-                  maxLength={500}
-                  required
-                />
-                <div className="flex justify-between items-center text-xs text-muted-foreground">
-                  <span>Maximum 500 characters</span>
-                  <span className={proof.length > 450 ? 'text-yellow-600' : ''}>
-                    {proof.length}/500
-                  </span>
-                </div>
+                <Label htmlFor="proof">Gift Card Code</Label>
+                <Input id="proof" placeholder="PY4NW2H7EWKZKTS5" value={proof} onChange={(event) => setProof(event.target.value)} maxLength={500} required />
+                <div className="flex items-center justify-between text-xs text-muted-foreground"><span>Maximum 500 characters</span><span className={proof.length > 450 ? 'text-yellow-600' : ''}>{proof.length}/500</span></div>
               </div>
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? 'Submitting...' : 'Submit Payment'}
-              </Button>
+              <Button type="submit" className="w-full" disabled={loading}>{loading ? 'Submitting...' : 'Submit Payment'}</Button>
             </form>
+            <div className="mt-5 space-y-1 text-sm text-muted-foreground">
+              <p>Review time: {CONTACT_INFO.reviewTime}.</p>
+              <p>Questions? <Link to="/support" className="text-primary hover:underline">Open support</Link> or email <a className="text-primary hover:underline" href={`mailto:${CONTACT_INFO.email}`}>{CONTACT_INFO.email}</a>.</p>
+            </div>
           </CardContent>
         </Card>
       </div>

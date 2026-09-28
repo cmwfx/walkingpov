@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,6 +15,8 @@ export function Signup() {
   const [loading, setLoading] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo') || '';
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -56,7 +58,7 @@ export function Signup() {
           duration: 5000,
         });
         // Redirect to verification page with email
-        navigate('/verify-email', { state: { email } });
+        navigate('/verify-email', { state: { email, returnTo } });
       }
     } catch {
       toast({
@@ -80,7 +82,7 @@ export function Signup() {
           </div>
           <CardTitle className="text-2xl text-center">Create your account</CardTitle>
           <CardDescription className="text-center">
-            Get lifetime premium access for just €50
+            Create your CandidFan account. Lifetime premium is €50, paid securely through a REWARBLE VISA gift card.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -124,7 +126,7 @@ export function Signup() {
           </form>
           <div className="mt-4 text-center text-sm">
             Already have an account?{' '}
-            <Link to="/login" className="text-primary hover:underline">
+            <Link to={returnTo ? `/login?returnTo=${encodeURIComponent(returnTo)}` : '/login'} className="text-primary hover:underline">
               Sign in
             </Link>
           </div>

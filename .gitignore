@@ -40,6 +40,7 @@ server/uploads/*
 
 # PM2
 .pm2/
+supabase/.temp/
 
 # OS
 .DS_Store

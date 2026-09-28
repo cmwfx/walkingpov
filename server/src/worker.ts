@@ -44,7 +44,7 @@ async function formatPaymentReviewEmail(row: { kind: string; outbox_id: string; 
   return { ...row, subject: email.subject, text_body: email.text, html_body: email.html };
 }
 
-async function runOnce() {
+async function runEmailOnce() {
   const { data, error } = await supabaseAdmin.rpc('claim_next_email', { p_worker_id: workerId });
   if (error) {
     console.error('email-claim-failed');
@@ -62,6 +62,10 @@ async function runOnce() {
     console.error('email-delivery-failed');
   }
   return true;
+}
+
+async function runOnce() {
+  return runEmailOnce();
 }
 
 async function main() {

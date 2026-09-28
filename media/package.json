@@ -2,6 +2,6 @@
   "name": "candidfan-media-verifier",
   "private": true,
   "type": "module",
-  "scripts": { "build": "tsc", "start": "node dist/verifier.js" },
+  "scripts": { "build": "tsc", "start": "node dist/verifier.js", "test": "npm run build && node --test dist/verifier.test.js" },
   "devDependencies": { "@types/node": "^20.11.5", "typescript": "^5.3.3" }
 }

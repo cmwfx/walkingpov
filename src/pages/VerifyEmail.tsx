@@ -63,9 +63,8 @@ export function VerifyEmail() {
           description: 'Redirecting you to payment...',
         });
 
-        // Redirect after 2 seconds
         setTimeout(() => {
-          navigate('/payment');
+          navigate('/payment', { replace: true });
         }, 2000);
       }
     } catch {

@@ -8,20 +8,16 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { PremiumBenefits } from '@/components/PremiumBenefits';
 import { DiscountTimer } from '@/components/DiscountTimer';
-import { Download, Lock, Tag, Crown, ArrowLeft, Sparkles, ImagePlus } from 'lucide-react';
+import { Download, Lock, Tag, Crown, ArrowLeft, ImagePlus, Sparkles } from 'lucide-react';
 import { getResponsiveImageUrls, generateSrcSet, getPrimaryImageUrl } from '@/lib/imageUtils';
 
-type DownloadLink = {
-  id: string;
-  label: string;
-  url: string;
-};
+type DownloadLink = { id: string; label: string; url: string };
 
 export function VideoDetail() {
   const { id } = useParams<{ id: string }>();
   const [video, setVideo] = useState<Video | null>(null);
-  const [downloadLinks, setDownloadLinks] = useState<DownloadLink[]>([]);
   const [loading, setLoading] = useState(true);
+  const [downloadLinks, setDownloadLinks] = useState<DownloadLink[]>([]);
   const [linksLoading, setLinksLoading] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [thumbnailFile, setThumbnailFile] = useState<File | null>(null);
@@ -34,11 +30,8 @@ export function VideoDetail() {
   useEffect(() => {
     if (id) {
       fetchVideo();
-      if (canAccessDownloads) {
-        fetchDownloadLinks();
-      }
+      if (canAccessDownloads) fetchDownloadLinks();
     }
-    // These local fetch functions intentionally follow the original page flow.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, canAccessDownloads]);
 
@@ -58,18 +51,6 @@ export function VideoDetail() {
     }
   };
 
-  const fetchDownloadLinks = async () => {
-    setLinksLoading(true);
-    try {
-      const data = await getDownloadUrl(id!);
-      setDownloadLinks([{ id: 'download', label: 'Download MP4', url: data.url }]);
-    } catch (error) {
-      console.error('Error fetching download links:', error);
-    } finally {
-      setLinksLoading(false);
-    }
-  };
-
   const handleThumbnailUpload = async () => {
     if (!id || !thumbnailFile) return;
     setThumbnailUploading(true);
@@ -86,6 +67,19 @@ export function VideoDetail() {
       });
     } finally {
       setThumbnailUploading(false);
+    }
+  };
+
+  const fetchDownloadLinks = async () => {
+    if (!id) return;
+    setLinksLoading(true);
+    try {
+      const { url } = await getDownloadUrl(id);
+      setDownloadLinks([{ id: 'download', label: 'Download MP4', url }]);
+    } catch (error) {
+      console.error('Error fetching download links:', error);
+    } finally {
+      setLinksLoading(false);
     }
   };
 
@@ -226,32 +220,9 @@ export function VideoDetail() {
               </CardHeader>
               <CardContent>
                 {canAccessDownloads ? (
-                  linksLoading ? (
-                    <div className="flex justify-center py-8">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    </div>
-                  ) : downloadLinks.length > 0 ? (
-                    <div className="space-y-3">
-                      {downloadLinks.map((link) => (
-                        <a
-                          key={link.id}
-                          href={link.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="block"
-                        >
-                          <Button variant="outline" className="w-full justify-start">
-                            <Download className="h-4 w-4 mr-2" />
-                            {link.label}
-                          </Button>
-                        </a>
-                      ))}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      No download links available yet
-                    </p>
-                  )
+                  linksLoading ? <div className="flex justify-center py-8"><div className="size-8 animate-spin rounded-full border-b-2 border-primary" /></div>
+                    : downloadLinks.length > 0 ? <div className="space-y-3">{downloadLinks.map((link) => <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="block"><Button variant="outline" className="w-full justify-start"><Download className="mr-2 size-4" />{link.label}</Button></a>)}</div>
+                      : <p className="py-4 text-center text-sm text-muted-foreground">No download links available yet</p>
                 ) : (
                   <div className="py-4 space-y-6">
                     <div className="text-center space-y-2">
@@ -266,34 +237,20 @@ export function VideoDetail() {
                     <PremiumBenefits />
 
                     {isAuthenticated ? (
-                      <Link to="/dashboard">
-                        <Button className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all shadow-lg shadow-primary/25 animate-pulse">
+                      <Link to="/payment">
+                        <Button className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all shadow-lg shadow-primary/25">
                           <Crown className="h-4 w-4 mr-2" />
-                          Upgrade Now
+                          Unlock for €50
                         </Button>
                       </Link>
                     ) : (
                       <div className="space-y-3">
-                        <div className="bg-primary/5 border border-primary/10 rounded-xl p-3 mb-2 backdrop-blur-sm">
-                          <div className="flex items-center justify-center gap-2 mb-2">
-                            <Sparkles className="h-4 w-4 text-yellow-500" />
-                            <span className="font-bold text-sm">Celebrating 10k Members!</span>
-                          </div>
-                          <div className="flex flex-col items-center gap-1">
-                            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Special Offer Ends In</span>
-                            <DiscountTimer />
-                          </div>
-                        </div>
                         <Link to="/signup">
-                          <Button className="w-full h-auto py-4 flex-col gap-1 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all shadow-lg shadow-primary/25 hover:scale-[1.02]">
+                          <Button className="w-full h-auto py-4 flex-col gap-1 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all shadow-lg shadow-primary/25">
                             <div className="flex items-center gap-2 font-bold text-lg">
-                              <Crown className="h-5 w-5" />
-                              Get Lifetime Access - €50
+                              <Crown className="h-5 w-5" /> Get Lifetime Access - €50
                             </div>
-                            <div className="flex items-center gap-2 text-xs opacity-90">
-                              <span className="line-through opacity-70">€200</span>
-                              <span className="bg-white/20 px-1.5 py-0.5 rounded text-[10px] font-bold">75% OFF</span>
-                            </div>
+                            <div className="flex items-center gap-2 text-xs opacity-90"><span className="line-through opacity-70">€200</span><span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">75% OFF</span></div>
                           </Button>
                         </Link>
                         <Link to="/login">
@@ -303,6 +260,7 @@ export function VideoDetail() {
                         </Link>
                       </div>
                     )}
+                    <div className="flex justify-center pt-2"><Sparkles className="mr-2 size-4 text-yellow-500" /><DiscountTimer /></div>
                   </div>
                 )}
               </CardContent>

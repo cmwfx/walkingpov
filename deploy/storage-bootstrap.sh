@@ -43,12 +43,16 @@ NODE_ENV=production
 PORT=3100
 MEDIA_ROOT=/srv/candidfan/media
 MEDIA_SIGNING_SECRET=${media_signing_secret}
+CORS_ORIGINS=https://candidfan.com,https://www.candidfan.com
 EOF
   chown root:candidfan-media /etc/candidfan/media.env
   chmod 0640 /etc/candidfan/media.env
 else
   media_signing_secret="$(sed -n 's/^MEDIA_SIGNING_SECRET=//p' /etc/candidfan/media.env)"
 fi
+
+sed -i -e '/^INSTANTVIDGRAB_CORS_ORIGINS=/d' -e '/^CORS_ORIGINS=/d' /etc/candidfan/media.env
+printf '\nCORS_ORIGINS=https://candidfan.com,https://www.candidfan.com\n' >> /etc/candidfan/media.env
 
 if [[ -z "${media_signing_secret}" ]]; then
   echo 'storage-bootstrap-missing-media-secret' >&2

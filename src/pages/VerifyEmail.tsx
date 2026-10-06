@@ -6,12 +6,14 @@ import { CheckCircle, Mail, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CodeInput } from '@/components/CodeInput';
 import { useToast } from '@/components/ui/use-toast';
+import { getSafeReturnTo } from '@/lib/navigation';
 
 export function VerifyEmail() {
   const { verifyEmailCode, resendVerificationCode } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const { toast } = useToast();
+  const returnTo = getSafeReturnTo(location.state?.returnTo, '/payment');
 
   const [email, setEmail] = useState<string>('');
   const [verifying, setVerifying] = useState(false);
@@ -64,7 +66,7 @@ export function VerifyEmail() {
         });
 
         setTimeout(() => {
-          navigate('/payment', { replace: true });
+          navigate(returnTo, { replace: true });
         }, 2000);
       }
     } catch {

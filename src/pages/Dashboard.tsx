@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { trackAnalyticsEvent } from '@/lib/analytics';
 
 export function Dashboard() {
   const { user } = useAuth();
@@ -21,8 +22,8 @@ export function Dashboard() {
           <CardHeader><CardTitle className="flex items-center gap-2"><Crown className="h-5 w-5 text-amber-300" />Membership</CardTitle></CardHeader>
           <CardContent>
             <p className="text-lg font-semibold capitalize">{status}</p>
-            <p className="mt-2 text-sm text-slate-400">{status === 'premium' ? 'Lifetime access is active. Protected downloads are available from each catalog item.' : status === 'pending' ? 'Your gift card proof is awaiting manual review.' : status === 'denied' ? 'Your last review was not approved. You can submit new proof when ready.' : 'Unlock lifetime access to download the collection.'}</p>
-            {status !== 'premium' && <Link to="/payment"><Button className="mt-5 bg-gradient-to-r from-violet-600 to-sky-600">{status === 'pending' ? 'View payment details' : 'Unlock lifetime access for €50'}</Button></Link>}
+            <p className="mt-2 text-sm text-slate-400">{status === 'premium' ? 'Lifetime access is active. Protected downloads are available from each catalog item.' : status === 'pending' ? 'Your gift card proof is awaiting manual review.' : status === 'denied' ? 'Your last review was not approved. You can submit new proof when ready.' : 'Card checkout starts at €50; a €50 gift card is also accepted.'}</p>
+            {status !== 'premium' && <Link to="/payment" onClick={() => trackAnalyticsEvent('premium_cta_click', { cta_location: 'dashboard' })}><Button className="mt-5 bg-gradient-to-r from-violet-600 to-sky-600">{status === 'pending' ? 'View payment details' : 'Unlock lifetime access from €50'}</Button></Link>}
           </CardContent>
         </Card>
 

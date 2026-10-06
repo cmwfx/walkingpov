@@ -1,4 +1,4 @@
-import { Outlet } from 'react-router-dom';
+import { Link, Outlet } from 'react-router-dom';
 import { Navbar } from './Navbar';
 import { Toaster } from './ui/toaster';
 import { Heart } from 'lucide-react';
@@ -18,10 +18,10 @@ export function Layout() {
               Made with <Heart className="h-4 w-4 text-red-500 fill-red-500" /> for premium content lovers
             </p>
             <p className="text-xs text-gray-500">
-              &copy; 2026 CandidFan. All rights reserved. Lifetime premium is €50.
+              &copy; 2026 CandidFan. All rights reserved. Card checkout starts at €50.
             </p>
             <div className="flex items-center justify-center gap-4 text-xs text-gray-600">
-              <span>Privacy Policy</span>
+              <Link className="transition-colors hover:text-gray-300" to="/privacy">Privacy Policy</Link>
               <span>�</span>
               <span>Terms of Service</span>
               <span>�</span>

@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Maximize2, Pause, Play, RotateCcw, Volume2, VolumeX } from 'lucide-react';
 import type { VideoPreview } from '@/lib/supabase';
 import { Button } from '@/components/ui/button';
+import { trackAnalyticsEvent } from '@/lib/analytics';
 
 type VideoPreviewPlayerProps = {
   preview: VideoPreview;
@@ -30,6 +31,8 @@ export function VideoPreviewPlayer({ preview, title, canDownload, premiumActionH
   const [muted, setMuted] = useState(false);
   const [finished, setFinished] = useState(false);
   const [playbackFailed, setPlaybackFailed] = useState(false);
+  const previewStartedTracked = useRef(false);
+  const previewLimitTracked = useRef(false);
 
   const sourceDuration = Math.max(0.01, preview.sourceDurationSeconds);
   const playableDuration = Math.max(0.01, Math.min(preview.previewDurationSeconds, sourceDuration, 10.05));
@@ -37,6 +40,10 @@ export function VideoPreviewPlayer({ preview, title, canDownload, premiumActionH
   const playedPercent = Math.min(playablePercent, (currentTime / sourceDuration) * 100);
 
   const stopAtPreviewEnd = () => {
+    if (!previewLimitTracked.current) {
+      previewLimitTracked.current = true;
+      trackAnalyticsEvent('preview_limit_reached');
+    }
     const video = videoRef.current;
     if (video) {
       video.pause();
@@ -95,7 +102,13 @@ export function VideoPreviewPlayer({ preview, title, canDownload, premiumActionH
         playsInline
         crossOrigin="anonymous"
         className="absolute inset-0 h-full w-full object-contain"
-        onPlay={() => setPlaying(true)}
+        onPlay={() => {
+          setPlaying(true);
+          if (!previewStartedTracked.current) {
+            previewStartedTracked.current = true;
+            trackAnalyticsEvent('preview_start');
+          }
+        }}
         onPause={() => setPlaying(false)}
         onTimeUpdate={(event) => {
           const time = event.currentTarget.currentTime;
@@ -109,11 +122,22 @@ export function VideoPreviewPlayer({ preview, title, canDownload, premiumActionH
         onError={() => setPlaybackFailed(true)}
       />
 
-      <div className="absolute left-3 top-3 rounded-full border border-white/20 bg-black/65 px-3 py-1 text-xs font-bold tracking-wide backdrop-blur">
+      {!playing && !finished && !playbackFailed && (
+        <button
+          type="button"
+          onClick={togglePlayback}
+          aria-label="Play video preview"
+          className="absolute left-1/2 top-1/2 z-30 flex h-16 w-16 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/70 bg-black/65 text-white shadow-xl backdrop-blur transition hover:scale-105 hover:bg-black/80 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-violet-400/70 sm:h-20 sm:w-20"
+        >
+          <Play className="ml-1 h-8 w-8 sm:h-10 sm:w-10" fill="currentColor" />
+        </button>
+      )}
+
+      <div className="absolute left-3 top-3 z-20 rounded-full border border-white/20 bg-black/65 px-3 py-1 text-xs font-bold tracking-wide backdrop-blur">
         10-SECOND PREVIEW
       </div>
 
-      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/95 via-black/65 to-transparent px-3 pb-3 pt-12 sm:px-5 sm:pb-4">
+      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 bg-gradient-to-t from-black/95 via-black/65 to-transparent px-3 pb-3 pt-12 sm:px-5 sm:pb-4">
         <div className="relative flex h-5 items-center">
           <div className="absolute inset-x-0 h-1.5 rounded-full bg-white/25" />
           <div className="absolute left-0 h-1.5 rounded-l-full bg-white/40" style={{ width: `${playablePercent}%` }} />
@@ -127,11 +151,11 @@ export function VideoPreviewPlayer({ preview, title, canDownload, premiumActionH
             step={0.1}
             value={Math.min(currentTime, sourceDuration)}
             onChange={(event) => handleSeek(Number(event.target.value))}
-            className="absolute inset-x-0 h-5 w-full cursor-pointer appearance-none bg-transparent accent-violet-400"
+            className="pointer-events-auto absolute inset-x-0 h-5 w-full cursor-pointer appearance-none bg-transparent accent-violet-400"
           />
         </div>
 
-        <div className="flex items-center gap-2 sm:gap-3">
+        <div className="pointer-events-auto flex items-center gap-2 sm:gap-3">
           <button type="button" onClick={togglePlayback} className="rounded p-1.5 hover:bg-white/15" aria-label={playing ? 'Pause preview' : 'Play preview'}>
             {playing ? <Pause className="h-5 w-5" fill="currentColor" /> : <Play className="h-5 w-5" fill="currentColor" />}
           </button>
@@ -148,36 +172,36 @@ export function VideoPreviewPlayer({ preview, title, canDownload, premiumActionH
       </div>
 
       {(finished || playbackFailed) && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/80 p-5 text-center backdrop-blur-sm">
-          <div className="max-w-md space-y-3">
+        <div className="absolute inset-0 z-30 overflow-y-auto overscroll-contain bg-black/80 p-2 text-center backdrop-blur-sm sm:p-5">
+          <div className="mx-auto flex min-h-full w-full max-w-md flex-col items-center justify-center gap-1.5 sm:gap-3">
             {playbackFailed ? (
               <>
-                <p className="text-lg font-bold">This preview could not be played.</p>
-                <p className="text-sm text-white/75">Try refreshing the page or using a browser that supports this video format.</p>
+                <p className="text-sm font-bold leading-snug sm:text-lg">This preview could not be played.</p>
+                <p className="text-xs leading-snug text-white/75 sm:text-sm">Try refreshing the page or using a browser that supports this video format.</p>
               </>
             ) : canDownload ? (
               <>
-                <p className="text-lg font-bold">Preview complete</p>
-                <p className="text-sm text-white/75">Download the full 4K video with your premium access.</p>
+                <p className="text-sm font-bold leading-snug sm:text-lg">Preview complete</p>
+                <p className="text-xs leading-snug text-white/75 sm:text-sm">Download the full 4K video with your premium access.</p>
                 {downloadUrl ? (
-                  <a href={downloadUrl} target="_blank" rel="noopener noreferrer" className="inline-block">
-                    <Button className="bg-violet-600 hover:bg-violet-500">Download the full video</Button>
+                  <a href={downloadUrl} target="_blank" rel="noopener noreferrer" onClick={() => trackAnalyticsEvent('download_link_click', { link_type: 'video_download', cta_location: 'preview_end' })} className="inline-block">
+                    <Button size="sm" className="bg-violet-600 hover:bg-violet-500">Download the full video</Button>
                   </a>
                 ) : (
-                  <p className="text-sm text-white/75">Use the Download Links panel to get the full video.</p>
+                  <p className="text-xs leading-snug text-white/75 sm:text-sm">Use the Download Links panel to get the full video.</p>
                 )}
               </>
             ) : (
               <>
-                <p className="text-lg font-bold">Get Premium to watch the full 4K video</p>
-                <p className="text-sm text-white/75">The preview is complete. Unlock lifetime access to download the full video.</p>
-                <Link to={premiumActionHref} className="inline-block">
-                  <Button className="bg-violet-600 hover:bg-violet-500">Get Premium</Button>
+                <p className="text-sm font-bold leading-snug sm:text-lg">Get Premium to watch the full 4K video</p>
+                <p className="text-xs leading-snug text-white/75 sm:text-sm">The preview is complete. Unlock lifetime access to download the full video.</p>
+                <Link to={premiumActionHref} onClick={() => trackAnalyticsEvent('premium_cta_click', { cta_location: 'preview_end' })} className="inline-block">
+                  <Button size="sm" className="bg-violet-600 hover:bg-violet-500">Get Premium</Button>
                 </Link>
               </>
             )}
             {!playbackFailed && (
-              <button type="button" onClick={togglePlayback} className="mx-auto flex items-center gap-2 rounded px-3 py-2 text-sm text-white/80 hover:bg-white/10 hover:text-white">
+              <button type="button" onClick={togglePlayback} className="mx-auto flex items-center gap-2 rounded px-3 py-1 text-xs text-white/80 hover:bg-white/10 hover:text-white sm:py-2 sm:text-sm">
                 <RotateCcw className="h-4 w-4" /> Replay preview
               </button>
             )}

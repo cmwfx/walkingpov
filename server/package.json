@@ -10,7 +10,7 @@
     "start": "node dist/index.js",
     "worker": "node dist/worker.js",
     "get-telegram-chat-id": "node dist/get-telegram-chat-id.js",
-    "test": "node --test dist/tests/security.test.js dist/tests/telegram.test.js dist/tests/ivgInternalSignature.test.js dist/tests/mediaSignature.test.js dist/tests/instantvidgrabVideoResolution.test.js dist/tests/instantvidgrabEntitlement.test.js dist/tests/instantvidgrabMembershipOutbox.test.js dist/tests/instantvidgrabLegacyMemberMigration.test.js dist/tests/legacyFeatureFlags.test.js dist/tests/instantvidgrabBoundary.test.js"
+    "test": "node --test dist/tests/security.test.js dist/tests/telegram.test.js dist/tests/analytics.test.js dist/tests/ivgInternalSignature.test.js dist/tests/mediaSignature.test.js dist/tests/instantvidgrabVideoResolution.test.js dist/tests/instantvidgrabEntitlement.test.js dist/tests/instantvidgrabMembershipOutbox.test.js dist/tests/instantvidgrabLegacyMemberMigration.test.js dist/tests/legacyFeatureFlags.test.js dist/tests/instantvidgrabCsrf.test.js dist/tests/instantvidgrabBoundary.test.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.3",

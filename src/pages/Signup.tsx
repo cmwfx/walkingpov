@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { UserPlus } from 'lucide-react';
+import { trackAnalyticsEvent } from '@/lib/analytics';
+import { getSafeReturnTo } from '@/lib/navigation';
 
 export function Signup() {
   const [email, setEmail] = useState('');
@@ -16,7 +18,8 @@ export function Signup() {
   const { signUp } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const returnTo = searchParams.get('returnTo') || '';
+  const requestedReturnTo = searchParams.get('returnTo');
+  const returnTo = requestedReturnTo ? getSafeReturnTo(requestedReturnTo, '') : '';
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -41,6 +44,7 @@ export function Signup() {
     }
 
     setLoading(true);
+    trackAnalyticsEvent('sign_up_start', { method: 'email' });
 
     try {
       const { error } = await signUp(email, password);
@@ -82,7 +86,7 @@ export function Signup() {
           </div>
           <CardTitle className="text-2xl text-center">Create your account</CardTitle>
           <CardDescription className="text-center">
-            Create your CandidFan account. Lifetime premium is €50, paid securely through a REWARBLE VISA gift card.
+            Create your CandidFan account. Card checkout starts at €50. A €50 REWARBLE VISA gift card is also accepted.
           </CardDescription>
         </CardHeader>
         <CardContent>

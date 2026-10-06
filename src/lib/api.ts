@@ -57,7 +57,8 @@ export async function updateVideoThumbnail(id: string, file: File) {
   return body as { thumbnail_url: string };
 }
 export const setVideoFeatured = (id: string, is_featured: boolean) => request<{ is_featured: boolean }>(`/api/admin/videos/${encodeURIComponent(id)}/featured`, { method: 'POST', body: JSON.stringify({ is_featured }) }, true);
-export const submitPayment = (proof: string) => request('/api/payments/submit', { method: 'POST', body: JSON.stringify({ proof }) }, true);
+export const submitPayment = (proof: string, gaClientId: string | null = null) => request('/api/payments/submit', { method: 'POST', body: JSON.stringify({ proof, gaClientId }) }, true);
+export const authorizeInstantVidGrab = (input: { state: string; challenge: string; intent: 'checkout' | 'download' | 'connect'; selectedVideoId?: string }) => request<{ redirect_to: string }>('/api/integrations/instantvidgrab/authorize', { method: 'POST', body: JSON.stringify(input) }, true);
 export const getPaymentRequests = () => request<import('./supabase').PaymentRequest[]>('/api/payments/requests', {}, true);
 export const reviewPayment = (id: string, decision: 'approved' | 'denied', notes: string) => request(`/api/payments/${id}/review`, { method: 'POST', body: JSON.stringify({ decision, notes }) }, true);
 export const getAdminStats = () => request<{ total_videos: number; total_users: number; pending_payments: number; premium_users: number; unread_support: number }>('/api/admin/stats', {}, true);

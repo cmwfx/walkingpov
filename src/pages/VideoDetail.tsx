@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useNavigate, useParams, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import type { Video, VideoPreview } from '@/lib/supabase';
 import { getDownloadUrl, getVideo, getVideoPreview, updateVideoThumbnail } from '@/lib/api';
@@ -7,15 +7,19 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { PremiumBenefits } from '@/components/PremiumBenefits';
+import { PremiumFaq } from '@/components/PremiumFaq';
 import { DiscountTimer } from '@/components/DiscountTimer';
 import { Download, Lock, Tag, Crown, ArrowLeft, ImagePlus, Sparkles } from 'lucide-react';
 import { getResponsiveImageUrls, generateSrcSet, getPrimaryImageUrl } from '@/lib/imageUtils';
 import { VideoPreviewPlayer } from '@/components/VideoPreviewPlayer';
+import { trackAnalyticsEvent } from '@/lib/analytics';
 
 type DownloadLink = { id: string; label: string; url: string };
 
 export function VideoDetail() {
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const navigate = useNavigate();
   const currentVideoId = useRef<string | null>(id || null);
   const [video, setVideo] = useState<Video | null>(null);
   const [preview, setPreview] = useState<VideoPreview | null>(null);
@@ -29,6 +33,36 @@ export function VideoDetail() {
   const { toast } = useToast();
 
   const canAccessDownloads = isPremium || isAdmin;
+
+  useLayoutEffect(() => {
+    window.scrollTo(0, 0);
+  }, [id]);
+
+  useEffect(() => {
+    if (video?.id === id) trackAnalyticsEvent('video_detail_view', { content_type: 'video' });
+  }, [id, video?.id]);
+
+  const backToBrowse = () => {
+    const routeState = location.state as { from?: unknown } | null;
+    const from = typeof routeState?.from === 'string' && routeState.from.startsWith('/') && !routeState.from.startsWith('//')
+      ? routeState.from
+      : null;
+    if (!from) {
+      navigate('/');
+      return;
+    }
+
+    let hasSavedPosition = false;
+    try {
+      const saved = sessionStorage.getItem('candidfan:browse-return');
+      if (saved) hasSavedPosition = (JSON.parse(saved) as { from?: string }).from === from;
+    } catch {
+      // Fall back to the known browse route if storage is unavailable.
+    }
+
+    if (hasSavedPosition) navigate(-1);
+    else navigate(from);
+  };
 
   useEffect(() => {
     currentVideoId.current = id || null;
@@ -127,12 +161,10 @@ export function VideoDetail() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-muted/20">
       <div className="container mx-auto px-4 py-8">
-        <Link to="/">
-          <Button variant="ghost" className="mb-4">
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Back to Browse
-          </Button>
-        </Link>
+        <Button variant="ghost" className="mb-4" onClick={backToBrowse}>
+          <ArrowLeft className="h-4 w-4 mr-2" />
+          Back to Browse
+        </Button>
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Content */}
@@ -254,7 +286,7 @@ export function VideoDetail() {
               <CardContent>
                 {canAccessDownloads ? (
                   linksLoading ? <div className="flex justify-center py-8"><div className="size-8 animate-spin rounded-full border-b-2 border-primary" /></div>
-                    : downloadLinks.length > 0 ? <div className="space-y-3">{downloadLinks.map((link) => <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" className="block"><Button variant="outline" className="w-full justify-start"><Download className="mr-2 size-4" />{link.label}</Button></a>)}</div>
+                    : downloadLinks.length > 0 ? <div className="space-y-3">{downloadLinks.map((link) => <a key={link.id} href={link.url} target="_blank" rel="noopener noreferrer" onClick={() => trackAnalyticsEvent('download_link_click', { link_type: 'video_download' })} className="block"><Button variant="outline" className="w-full justify-start"><Download className="mr-2 size-4" />{link.label}</Button></a>)}</div>
                       : <p className="py-4 text-center text-sm text-muted-foreground">No download links available yet</p>
                 ) : (
                   <div className="py-4 space-y-6">
@@ -270,15 +302,15 @@ export function VideoDetail() {
                     <PremiumBenefits />
 
                     {isAuthenticated ? (
-                      <Link to="/payment">
+                      <Link to="/payment" onClick={() => trackAnalyticsEvent('premium_cta_click', { cta_location: 'download_sidebar' })}>
                         <Button className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all shadow-lg shadow-primary/25">
                           <Crown className="h-4 w-4 mr-2" />
-                          Unlock for €50
+                          Unlock from €50
                         </Button>
                       </Link>
                     ) : (
                       <div className="space-y-3">
-                        <Link to="/signup">
+                        <Link to="/signup" onClick={() => trackAnalyticsEvent('premium_cta_click', { cta_location: 'download_sidebar' })}>
                           <Button className="w-full h-auto py-4 flex-col gap-1 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all shadow-lg shadow-primary/25">
                             <div className="flex items-center gap-2 font-bold text-lg">
                               <Crown className="h-5 w-5" /> Get Lifetime Access - €50
@@ -298,6 +330,7 @@ export function VideoDetail() {
                 )}
               </CardContent>
             </Card>
+            {!canAccessDownloads && <PremiumFaq className="mt-6" />}
           </div>
         </div>
       </div>

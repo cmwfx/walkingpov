@@ -1,31 +1,47 @@
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { PremiumBenefits } from '@/components/PremiumBenefits';
+import { PremiumFaq } from '@/components/PremiumFaq';
 import { DiscountTimer } from '@/components/DiscountTimer';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
-import { CONTACT_INFO, GIFT_CARD_LINK } from '@/lib/utils';
+import { CONTACT_INFO, GIFT_CARD_LINK, INSTANTVIDGRAB_CHECKOUT_ENABLED, INSTANTVIDGRAB_URL } from '@/lib/utils';
 import { submitPayment } from '@/lib/api';
+import { getAnalyticsClientId, trackAnalyticsEvent } from '@/lib/analytics';
 import { CheckCircle, CreditCard, ExternalLink, Sparkles } from 'lucide-react';
 
 export function PaymentSubmit() {
   const [proof, setProof] = useState('');
   const [loading, setLoading] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  const checkoutTracked = useRef(false);
+  const analyticsClientId = useRef<Promise<string | null> | null>(null);
   const { user, refreshUser } = useAuth();
   const { toast } = useToast();
   const hasPendingLegacyReview = user?.membership_status === 'pending';
   const isAlreadyPremium = user?.membership_status === 'premium';
 
+  useEffect(() => {
+    analyticsClientId.current ??= getAnalyticsClientId();
+  }, []);
+
+  useEffect(() => {
+    if (!user || hasPendingLegacyReview || isAlreadyPremium || checkoutTracked.current) return;
+    checkoutTracked.current = true;
+    trackAnalyticsEvent('begin_checkout', { currency: 'EUR', value: 50 });
+  }, [hasPendingLegacyReview, isAlreadyPremium, user]);
+
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     setLoading(true);
     try {
-      await submitPayment(proof.trim());
+      const gaClientId = await (analyticsClientId.current ?? getAnalyticsClientId());
+      await submitPayment(proof.trim(), gaClientId);
+      trackAnalyticsEvent('payment_proof_submitted', { payment_method: 'gift_card', currency: 'EUR', value: 50 });
       await refreshUser();
       setSubmitted(true);
       toast({ title: 'Payment submitted!', description: 'Your payment is under review. We will contact you soon.' });
@@ -64,6 +80,7 @@ export function PaymentSubmit() {
             <CardDescription>Your existing CandidFan access is preserved. We won’t ask you to pay again here.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <Button asChild className="w-full"><a href={`${INSTANTVIDGRAB_URL}/connect/start?intent=connect`}>Connect InstantVidGrab for free</a></Button>
             <Button asChild variant="outline" className="w-full"><Link to="/dashboard">Return to Dashboard</Link></Button>
           </CardContent>
         </Card>
@@ -79,17 +96,29 @@ export function PaymentSubmit() {
             <Sparkles className="size-4 text-yellow-500" /> Celebrating 10k Members! <span className="border-l border-primary/20 pl-3">Offer ends in <DiscountTimer /></span>
           </div>
           <h1 className="mb-3 text-4xl font-bold">Lifetime Premium Access</h1>
-          <p className="mb-8 text-xl text-muted-foreground">One-time payment of €50</p>
+          <p className="mb-8 text-xl text-muted-foreground">One-time card payment from €50</p>
           <div className="mx-auto mb-12 max-w-xl text-left"><PremiumBenefits className="rounded-xl border bg-muted/30 p-6" /></div>
         </div>
 
-        <Card className="mb-8">
+        {INSTANTVIDGRAB_CHECKOUT_ENABLED && <Card className="mb-8 border-primary/30">
           <CardHeader>
-            <CardTitle>REWARBLE VISA Gift Card Payment</CardTitle>
-            <CardDescription>Purchase a €50 REWARBLE VISA gift card from the link below and submit its code. The retailer accepts PayPal, Visa, Mastercard, and other payment methods.</CardDescription>
+            <CardTitle>Pay securely by card</CardTitle>
+            <CardDescription>One-time €50 payment for CandidFan Premium and lifetime InstantVidGrab access. Card details are handled by the secure payment processor.</CardDescription>
           </CardHeader>
           <CardContent>
-            <a href={GIFT_CARD_LINK} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-2 rounded-lg bg-primary p-4 text-primary-foreground transition-colors hover:bg-primary/90">
+            <a href={`${INSTANTVIDGRAB_URL}/connect/start?intent=checkout`} onClick={() => trackAnalyticsEvent('card_checkout_outbound_click', { currency: 'EUR', value: 50 })} className="flex items-center justify-center gap-2 rounded-lg bg-primary p-4 text-primary-foreground transition-colors hover:bg-primary/90">
+              <CreditCard className="size-5" /> Continue to secure card checkout
+            </a>
+          </CardContent>
+        </Card>}
+
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle>Gift card payment</CardTitle>
+            <CardDescription>Prefer to pay by gift card? Purchase a €50 REWARBLE VISA gift card below and submit its code. Gift card payments are reviewed manually.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <a href={GIFT_CARD_LINK} target="_blank" rel="noopener noreferrer" onClick={() => trackAnalyticsEvent('gift_card_outbound_click', { currency: 'EUR', value: 50 })} className="flex items-center justify-center gap-2 rounded-lg bg-primary p-4 text-primary-foreground transition-colors hover:bg-primary/90">
               <CreditCard className="size-5" /> Purchase REWARBLE VISA Gift Card <ExternalLink className="size-4" />
             </a>
           </CardContent>
@@ -110,11 +139,12 @@ export function PaymentSubmit() {
               <Button type="submit" className="w-full" disabled={loading}>{loading ? 'Submitting...' : 'Submit Payment'}</Button>
             </form>
             <div className="mt-5 space-y-1 text-sm text-muted-foreground">
-              <p>Review time: {CONTACT_INFO.reviewTime}.</p>
+              <p>Payment review: {CONTACT_INFO.reviewTime}.</p>
               <p>Questions? <Link to="/support" className="text-primary hover:underline">Open support</Link> or email <a className="text-primary hover:underline" href={`mailto:${CONTACT_INFO.email}`}>{CONTACT_INFO.email}</a>.</p>
             </div>
           </CardContent>
         </Card>
+        <PremiumFaq className="mt-8" />
       </div>
     </div>
   );

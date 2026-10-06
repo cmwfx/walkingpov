@@ -19,7 +19,11 @@ export function generateCsrfToken(req: Request, res: Response, next: NextFunctio
 
 export function verifyCsrfToken(req: Request, res: Response, next: NextFunction) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method)) return next();
-  if (req.path === '/integrations/instantvidgrab/entitlements') return next();
+  if (req.method === 'POST' && [
+    '/integrations/instantvidgrab/exchange',
+    '/integrations/instantvidgrab/link',
+    '/integrations/instantvidgrab/entitlements',
+  ].includes(req.path)) return next();
   if (req.path.startsWith('/import/') && importerToken && req.headers.authorization === `Bearer ${importerToken}`) return next();
   const cookieToken = req.cookies?.[COOKIE] as string | undefined;
   const headerToken = req.headers[HEADER] as string | undefined;

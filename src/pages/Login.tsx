@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/components/ui/use-toast';
 import { LogIn, Loader2 } from 'lucide-react';
+import { getSafeReturnTo } from '@/lib/navigation';
 
 export function Login() {
   const [email, setEmail] = useState('');
@@ -16,6 +17,9 @@ export function Login() {
   const [resending, setResending] = useState(false);
   const { signIn, resendVerificationCode } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const requestedReturnTo = searchParams.get('returnTo');
+  const returnTo = requestedReturnTo ? getSafeReturnTo(requestedReturnTo, '/dashboard') : '/dashboard';
   const { toast } = useToast();
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -49,7 +53,7 @@ export function Login() {
           title: 'Welcome back!',
           description: 'Successfully logged in.',
         });
-        navigate('/dashboard', { replace: true });
+        navigate(returnTo, { replace: true });
       }
     } catch {
       toast({
@@ -88,7 +92,7 @@ export function Login() {
           description: 'A new verification code has been sent to your email.',
         });
         // Redirect to verification page
-        navigate('/verify-email', { state: { email } });
+        navigate('/verify-email', { state: { email, returnTo } });
       }
     } catch {
       toast({
@@ -171,7 +175,7 @@ export function Login() {
 
           <div className="mt-4 text-center text-sm">
             Don't have an account?{' '}
-            <Link to="/signup" className="text-primary hover:underline">
+            <Link to={requestedReturnTo ? `/signup?returnTo=${encodeURIComponent(returnTo)}` : '/signup'} className="text-primary hover:underline">
               Sign up
             </Link>
           </div>

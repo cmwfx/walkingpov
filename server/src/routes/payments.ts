@@ -4,6 +4,7 @@ import { paymentLimiter } from '../middleware/rateLimiter.js';
 import { supabaseAdmin } from '../config/supabase.js';
 import { encrypt, decrypt, isEncrypted } from '../services/encryption.js';
 import { makePaymentReviewEmail } from '../services/paymentReviewEmail.js';
+import { isGa4Configured, isValidGa4ClientId, sendGa4Purchase } from '../services/analytics.js';
 
 const router = Router();
 
@@ -14,12 +15,15 @@ function errorCode(error: unknown) {
 
 router.post('/submit', paymentLimiter, verifyToken, async (req: AuthRequest, res) => {
   const proof = typeof req.body?.proof === 'string' ? req.body.proof.trim() : '';
+  const suppliedGaClientId = typeof req.body?.gaClientId === 'string' ? req.body.gaClientId.trim() : null;
+  const gaClientId = isValidGa4ClientId(suppliedGaClientId) && isGa4Configured() ? suppliedGaClientId : null;
   if (!proof || proof.length > 500) return res.status(400).json({ error: 'Enter a valid gift card proof.' });
   try {
     const encrypted = encrypt(proof);
     const { error } = await supabaseAdmin.rpc('submit_payment_request', {
       p_user_id: req.user!.id,
       p_proof_encrypted: encrypted,
+      p_ga_client_id: gaClientId,
     });
     if (error) throw error;
     return res.status(201).json({ message: 'Your gift card proof was submitted for review.' });
@@ -103,6 +107,29 @@ router.post('/:id/review', verifyToken, requireAdmin, async (req: AuthRequest, r
         console.error('payment-review-email-row-not-found');
       }
     }
+    const requestId = review?.[0]?.request_id as string | undefined;
+    if (requestId && decision === 'approved' && isGa4Configured()) {
+      const { data: payment, error: paymentReadError } = await supabaseAdmin
+        .from('payment_requests')
+        .select('ga_client_id')
+        .eq('id', requestId)
+        .maybeSingle();
+      if (paymentReadError) {
+        console.error('ga4-purchase-attribution-read-failed');
+      } else if (payment && isValidGa4ClientId(payment.ga_client_id)) {
+        await sendGa4Purchase(payment.ga_client_id, requestId);
+      }
+    }
+
+    // Keep the browser identifier only until the payment request is reviewed.
+    if (requestId) {
+      const { error: attributionClearError } = await supabaseAdmin
+        .from('payment_requests')
+        .update({ ga_client_id: null })
+        .eq('id', requestId);
+      if (attributionClearError) console.error('ga4-attribution-cleanup-failed');
+    }
+
     return res.json({ message: 'Payment review saved.' });
   } catch (error) {
     const code = errorCode(error);

@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { ApiRequestError, getMe } from '@/lib/api';
+import { trackAnalyticsEvent } from '@/lib/analytics';
 import { supabase, type User } from '@/lib/supabase';
 
 type AuthContext = {
@@ -110,13 +111,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshUser, session?.access_token]);
   const value = useMemo<AuthContext>(() => ({
     user, session, loading,
-    signIn: async (email, password) => { const { error } = await supabase.auth.signInWithPassword({ email, password }); return { error }; },
+    signIn: async (email, password) => {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (!error) trackAnalyticsEvent('login', { method: 'email' });
+      return { error };
+    },
     signUp: async (email, password) => {
       try {
         const { error } = await withAuthTimeout(
           supabase.auth.signUp({ email, password, options: { emailRedirectTo: `${window.location.origin}/verify-email` } }),
           'Account creation',
         );
+        if (!error) trackAnalyticsEvent('sign_up', { method: 'email' });
         return { error };
       } catch (error) {
         return { error: error instanceof Error ? error : new Error('Unable to create your account. Please try again.') };
@@ -128,6 +134,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           supabase.auth.verifyOtp({ email, token, type: 'signup' }),
           'Email verification',
         );
+        if (!error) trackAnalyticsEvent('email_verified', { method: 'email' });
         return { error };
       } catch (error) {
         return { error: error instanceof Error ? error : new Error('Unable to verify your email. Please try again.') };

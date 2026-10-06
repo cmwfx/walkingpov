@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { HomepageHero } from '@/components/HomepageHero';
 import { VideoGrid } from '@/components/VideoGrid';
 import { VideoGridSkeleton } from '@/components/VideoSkeleton';
 import { Pagination } from '@/components/Pagination';
@@ -10,12 +12,14 @@ import { Search, X } from 'lucide-react';
 import { useToast } from '@/components/ui/use-toast';
 
 export function Home() {
+  const location = useLocation();
   const [searchParams, setSearchParams] = useSearchParams();
   const [videos, setVideos] = useState<Video[]>([]);
   const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
   const [searchTag, setSearchTag] = useState('');
   const { toast } = useToast();
+  const { user, isAuthenticated, isAdmin, isPremium, loading: authLoading } = useAuth();
 
   const handleFeaturedChange = (videoId: string, isFeatured: boolean) => {
     setVideos((current) => current.map((video) => video.id === videoId ? { ...video, is_featured: isFeatured } : video));
@@ -24,6 +28,11 @@ export function Home() {
   // Read initial state from URL
   const currentPage = parseInt(searchParams.get('page') || '1', 10);
   const filterTag = searchParams.get('tag') || '';
+  const isLandingPage = currentPage === 1 && !filterTag.trim();
+  const showHomepageHero = !authLoading && isLandingPage && !isAdmin && (
+    !isAuthenticated || (!isPremium && user?.membership_status === 'free')
+  );
+  const premiumHref = isAuthenticated ? '/payment' : '/signup?returnTo=%2Fpayment';
 
   useEffect(() => {
     // Sync search input with URL filter tag
@@ -35,6 +44,32 @@ export function Home() {
     // fetchVideos is intentionally kept local to preserve the original page behavior.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPage, filterTag]);
+
+  useEffect(() => {
+    if (loading) return;
+
+    let savedPosition: { from?: string; scrollY?: number } | null = null;
+    try {
+      const saved = sessionStorage.getItem('candidfan:browse-return');
+      if (saved) savedPosition = JSON.parse(saved) as { from?: string; scrollY?: number };
+    } catch {
+      return;
+    }
+
+    const currentPath = `${location.pathname}${location.search}${location.hash}`;
+    if (savedPosition?.from !== currentPath || typeof savedPosition.scrollY !== 'number') return;
+
+    const frame = window.requestAnimationFrame(() => {
+      window.scrollTo(0, savedPosition!.scrollY!);
+      try {
+        sessionStorage.removeItem('candidfan:browse-return');
+      } catch {
+        // Ignore storage cleanup failures after restoring the position.
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
+  }, [loading, location.hash, location.pathname, location.search]);
 
   const fetchVideos = async (page: number, tag?: string) => {
     setLoading(true);
@@ -78,6 +113,8 @@ export function Home() {
 
   return (
     <div className="min-h-screen">
+      {showHomepageHero && <HomepageHero premiumHref={premiumHref} />}
+
       {/* Animated Background */}
       <div className="fixed inset-0 -z-10 overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900" />
@@ -86,7 +123,7 @@ export function Home() {
         <div className="absolute -bottom-8 left-20 w-72 h-72 bg-pink-500 rounded-full mix-blend-multiply filter blur-xl opacity-20 animate-blob animation-delay-4000" />
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div id="home-catalog" className="container mx-auto scroll-mt-20 px-4 py-8">
         {/* Search Bar */}
         <div className="max-w-4xl mx-auto mb-12 pt-4">
           <form onSubmit={handleSearch} className="relative">

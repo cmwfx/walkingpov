@@ -1,4 +1,4 @@
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useEffect, useRef, useState } from 'react';
 import type { Video } from '@/lib/supabase';
 import { Card } from '@/components/ui/card';
@@ -20,6 +20,16 @@ export function VideoCard({ video, onFeaturedChange }: VideoCardProps) {
   const imgRef = useRef<HTMLDivElement>(null);
   const { isAdmin } = useAuth();
   const { toast } = useToast();
+  const location = useLocation();
+  const browsePath = `${location.pathname}${location.search}${location.hash}`;
+
+  const rememberBrowsePosition = () => {
+    try {
+      sessionStorage.setItem('candidfan:browse-return', JSON.stringify({ from: browsePath, scrollY: window.scrollY }));
+    } catch {
+      // Navigation still works if browser storage is unavailable.
+    }
+  };
 
   useEffect(() => {
     if (!imgRef.current) return;
@@ -64,7 +74,7 @@ export function VideoCard({ video, onFeaturedChange }: VideoCardProps) {
   return (
     <div className="group relative h-full">
       <Card className="relative overflow-hidden border-white/10 bg-white/5 backdrop-blur-sm transition-all duration-500 hover:bg-white/10 hover:scale-[1.02] hover:shadow-2xl hover:shadow-purple-500/30">
-        <Link to={`/video/${video.id}`} className="block">
+        <Link to={`/video/${video.id}`} state={{ from: browsePath }} onClick={rememberBrowsePosition} className="block">
         <div ref={imgRef} className="aspect-[16/10] relative overflow-hidden bg-gradient-to-br from-purple-900/20 to-blue-900/20">
           {!imageLoaded && imageSrc && <div className="absolute inset-0 bg-gradient-to-br from-purple-900/40 to-blue-900/40 animate-pulse" />}
 
@@ -101,7 +111,7 @@ export function VideoCard({ video, onFeaturedChange }: VideoCardProps) {
         )}
       </Card>
 
-      <Link to={`/video/${video.id}`} className="block px-1 pt-4">
+      <Link to={`/video/${video.id}`} state={{ from: browsePath }} onClick={rememberBrowsePosition} className="block px-1 pt-4">
         {video.is_featured && !isAdmin && (
           <div className="mb-2 inline-flex items-center gap-1 rounded-full border border-yellow-300/30 bg-yellow-300/10 px-3 py-1 text-xs font-medium text-yellow-200">
             <Sparkles className="h-3.5 w-3.5 text-yellow-400" />

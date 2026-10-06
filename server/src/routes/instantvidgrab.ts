@@ -38,14 +38,6 @@ import {
 const router = Router();
 const AUTH_CODE_LIFETIME_MS = 2 * 60 * 1_000;
 
-// Keep only the incoming, signed fulfillment callback available while orders
-// that were already in checkout are reconciled. All user/account integration
-// endpoints remain retired.
-router.use((req, res, next) => {
-  if (req.path === "/entitlements") return next();
-  return res.status(410).json({ error: { code: "integration_removed" } });
-});
-
 const instantVidGrabVideoResolutionSchema = z.object({
   walkingpovUserId: z.string().uuid(),
   instantvidgrabUserId: z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/),
@@ -75,6 +67,9 @@ router.post('/authorize', verifyToken, verifyCsrfToken, async (req: AuthRequest,
   }
   if (input.data.intent === 'download' && !instantVidGrabDownloadsEnabled()) {
     return res.status(503).json({ error: 'Secure downloads are temporarily unavailable.' });
+  }
+  if (input.data.intent === 'checkout' && req.user?.membership_status === 'premium') {
+    return res.status(409).json({ error: 'Your CandidFan Premium is already active. Connect InstantVidGrab at no charge.' });
   }
   if (!req.user?.email_verified) return res.status(403).json({ error: 'Verify your CandidFan email before continuing.' });
 

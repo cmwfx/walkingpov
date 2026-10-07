@@ -1,11 +1,11 @@
 import { Download, Infinity as InfinityIcon, Sparkles, Video } from 'lucide-react';
 
-export function PaymentBenefits({ cardCheckoutEnabled }: { cardCheckoutEnabled: boolean }) {
+export function PaymentBenefits({ cardCheckoutEnabled, tier = 'lifetime' }: { cardCheckoutEnabled: boolean; tier?: 'lifetime'|'monthly' }) {
   const benefits = [
     { icon: Download, title: 'Full-video downloads', description: 'Save complete videos from the Premium library.' },
     { icon: Video, title: 'The full Premium library', description: 'Explore the collection and download the videos you want.' },
-    { icon: InfinityIcon, title: 'Lifetime membership', description: 'One upgrade. No monthly bills or recurring subscription.' },
-    ...(cardCheckoutEnabled ? [{ icon: Sparkles, title: 'InstantVidGrab included', description: 'Card checkout also includes lifetime InstantVidGrab access.' }] : []),
+    { icon: InfinityIcon, title: tier === 'monthly' ? 'Flexible monthly access' : 'Lifetime membership', description: tier === 'monthly' ? 'Stop renewal with one click. Access stays active through the paid period.' : 'One upgrade. No monthly bills or recurring subscription.' },
+    ...(cardCheckoutEnabled ? [{ icon: Sparkles, title: 'InstantVidGrab included', description: tier === 'monthly' ? 'InstantVidGrab access is included while your subscription is paid.' : 'Card checkout also includes lifetime InstantVidGrab access.' }] : []),
   ];
   return (
     <section aria-labelledby="payment-benefits-heading">

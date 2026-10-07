@@ -23,6 +23,7 @@ export function verifyCsrfToken(req: Request, res: Response, next: NextFunction)
     '/integrations/instantvidgrab/exchange',
     '/integrations/instantvidgrab/link',
     '/integrations/instantvidgrab/entitlements',
+    '/integrations/instantvidgrab/subscription-entitlements',
   ].includes(req.path)) return next();
   if (req.path.startsWith('/import/') && importerToken && req.headers.authorization === `Bearer ${importerToken}`) return next();
   const cookieToken = req.cookies?.[COOKIE] as string | undefined;

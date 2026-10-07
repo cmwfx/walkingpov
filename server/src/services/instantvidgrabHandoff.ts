@@ -3,6 +3,7 @@ import { z } from 'zod';
 
 type WalkingPOVGrantSnapshotRow = {
   product: string;
+  source_type?: string;
   state: string;
   version: number | string;
 };
@@ -18,7 +19,7 @@ export function deriveWalkingPOVAccessSnapshot(
   let revision = 0n;
   let legacyPremium = false;
   for (const row of rows) {
-    if (row.product !== 'walkingpov') continue;
+    if (row.product !== 'walkingpov' || row.source_type === 'instantvidgrab_subscription') continue;
     if (!['active', 'suspended', 'revoked'].includes(row.state)) {
       throw new Error('WalkingPOV grant state is invalid.');
     }

@@ -18,7 +18,7 @@ export function Layout() {
               Made with <Heart className="h-4 w-4 text-red-500 fill-red-500" /> for premium content lovers
             </p>
             <p className="text-xs text-gray-500">
-              &copy; 2026 CandidFan. All rights reserved. Card checkout starts at €50.
+              &copy; 2026 CandidFan. All rights reserved. Premium from €9.99 per month or €50 lifetime.
             </p>
             <div className="flex items-center justify-center gap-4 text-xs text-gray-600">
               <Link className="transition-colors hover:text-gray-300" to="/privacy">Privacy Policy</Link>

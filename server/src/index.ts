@@ -8,6 +8,7 @@ import path from 'node:path';
 import { apiLimiter, readApiLimiter } from './middleware/rateLimiter.js';
 import { generateCsrfToken, verifyCsrfToken } from './middleware/csrf.js';
 import { AuthRequest, verifyToken } from './middleware/auth.js';
+import billing from './routes/billing.js';
 import videos from './routes/videos.js';
 import payments from './routes/payments.js';
 import support from './routes/support.js';
@@ -84,6 +85,7 @@ export function createApp() {
 
   app.get('/api/me', verifyToken, (req: AuthRequest, res) => res.json({ user: req.user }));
   app.use('/api/integrations/instantvidgrab', instantvidgrab);
+  app.use('/api/billing', billing);
   app.use('/api/videos', videos);
   app.use('/api/payments', payments);
   app.use('/api/support', support);

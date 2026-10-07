@@ -38,6 +38,9 @@ async function request<T>(pathname: string, init: RequestInit = {}, authenticate
 }
 
 export const getMe = () => request<{ user: import('./supabase').User }>('/api/me', {}, true);
+export type BillingSummary = { plan: 'monthly' | 'lifetime' | null; subscription: null | {status:string; paidThrough:string|null; currentPeriodEnd:string|null; cancelAtPeriodEnd:boolean; cancellationPending:boolean; priceMinor:number; currency:string} };
+export const getSubscription = () => request<BillingSummary>('/api/billing/subscription',{},true);
+export const cancelSubscription = () => request<{cancelled:true}>('/api/billing/subscription/cancel',{method:'POST',body:'{}'},true);
 export const getVideos = (page = 1, tag = '') => request<{ videos: import('./supabase').Video[]; pagination: { page: number; total: number; totalPages: number } }>(`/api/videos?page=${page}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`);
 export const getVideo = (id: string) => request<import('./supabase').Video>(`/api/videos/${encodeURIComponent(id)}`);
 export const getVideoPreview = (id: string) => request<import('./supabase').VideoPreview>(`/api/videos/${encodeURIComponent(id)}/preview`);

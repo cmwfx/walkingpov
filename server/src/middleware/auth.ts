@@ -1,4 +1,5 @@
 import { NextFunction, Request, Response } from 'express';
+import { effectiveMembership } from '../services/subscriptionAccess.js';
 import { supabaseAdmin } from '../config/supabase.js';
 
 export type MembershipStatus = 'free' | 'pending' | 'premium' | 'denied';
@@ -9,6 +10,7 @@ export interface AuthUser {
   email_verified: boolean;
   is_admin: boolean;
   membership_status: MembershipStatus;
+  premium_plan?: "lifetime" | "monthly" | null;
 }
 
 export interface AuthRequest extends Request {
@@ -35,6 +37,7 @@ export async function verifyToken(req: AuthRequest, res: Response, next: NextFun
     if (profileError || !profile) return res.status(401).json({ error: 'Account profile unavailable' });
     req.user = {
       ...(profile as Omit<AuthUser, 'email_verified'>),
+      ...(await effectiveMembership(data.user.id, profile.membership_status)),
       email_verified: Boolean(data.user.email_confirmed_at),
     };
     return next();

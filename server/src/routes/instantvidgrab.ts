@@ -1,3 +1,4 @@
+import { effectiveMembership } from '../services/subscriptionAccess.js';
 import { createHash } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
@@ -68,7 +69,7 @@ router.post('/authorize', verifyToken, verifyCsrfToken, async (req: AuthRequest,
   if (input.data.intent === 'download' && !instantVidGrabDownloadsEnabled()) {
     return res.status(503).json({ error: 'Secure downloads are temporarily unavailable.' });
   }
-  if (input.data.intent === 'checkout' && req.user?.membership_status === 'premium') {
+  if (input.data.intent === 'checkout' && req.user?.membership_status === 'premium' && req.user?.premium_plan !== 'monthly') {
     return res.status(409).json({ error: 'Your CandidFan Premium is already active. Connect InstantVidGrab at no charge.' });
   }
   if (!req.user?.email_verified) return res.status(403).json({ error: 'Verify your CandidFan email before continuing.' });
@@ -147,7 +148,7 @@ router.post('/exchange', requireIvgInternalAuth, async (req, res) => {
 
     const { data: grants, error: grantsError } = await supabaseAdmin
       .from('ivg_access_grants')
-      .select('product, state, version')
+      .select('product, state, version, source_type')
       .eq('user_id', authCode.walkingpov_user_id)
       .eq('product', 'walkingpov');
     if (grantsError) throw grantsError;
@@ -186,7 +187,7 @@ router.post('/link', requireIvgInternalAuth, async (req, res) => {
 
     const { data: grants, error: grantsError } = await supabaseAdmin
       .from('ivg_access_grants')
-      .select('product, state, version')
+      .select('product, state, version, source_type')
       .eq('user_id', input.data.walkingpovUserId)
       .eq('product', 'walkingpov');
     if (grantsError) throw grantsError;
@@ -264,7 +265,7 @@ router.post('/resolve-video', requireIvgInternalAuth, async (req, res) => {
             .maybeSingle();
           if (error) throw error;
           return data
-            ? { membershipStatus: data.membership_status, isAdmin: data.is_admin === true }
+            ? { membershipStatus: (await effectiveMembership(walkingpovUserId, data.membership_status)).membership_status, isAdmin: data.is_admin === true }
             : null;
         },
         async readReadyVideo(videoId) {
@@ -347,6 +348,31 @@ router.post('/entitlements', requireIvgInternalAuth, async (req, res) => {
     console.error('ivg-entitlement-apply-failed');
     return res.status(503).json({ error: { code: 'integration_unavailable' } });
   }
+});
+
+const subscriptionEventSchema = z.object({
+  eventId:z.string().max(160).regex(/^ivg:subscription:sub_[a-f0-9]{32}:[1-9][0-9]*$/),
+  sourceId:z.string().regex(/^sub_[a-f0-9]{32}$/),
+  walkingpovUserId:z.string().uuid(),instantvidgrabUserId:z.string().regex(/^[A-Za-z0-9][A-Za-z0-9._-]{0,35}$/),
+  grantState:z.enum(['active','suspended','revoked']),grantVersion:z.number().int().min(1).max(2147483647),
+  paidThrough:z.string().datetime().nullable(),currentPeriodEnd:z.string().datetime().nullable(),
+  status:z.enum(['active','past_due','trialing','canceled','expired','completed','unresolved','drafted','canceling']),
+  cancelAtPeriodEnd:z.boolean(),cancellationPending:z.boolean(),
+}).strict().refine(v => v.eventId === `ivg:subscription:${v.sourceId}:${v.grantVersion}` && (v.grantState !== 'active' || v.paidThrough !== null));
+router.post('/subscription-entitlements', requireIvgInternalAuth, async (req,res) => {
+  const input=subscriptionEventSchema.safeParse(req.body);
+  if (!input.success) return res.status(400).json({error:{code:'invalid_subscription_event'}});
+  const e=input.data;
+  const hash=createHash('sha256').update(JSON.stringify(e)).digest('hex');
+  try {
+    const {data,error}=await supabaseAdmin.rpc('apply_ivg_subscription_event',{
+      p_event_id:e.eventId,p_payload_hash:`\\x${hash}`,p_user_id:e.walkingpovUserId,p_ivg_user_id:e.instantvidgrabUserId,
+      p_source_id:e.sourceId,p_grant_state:e.grantState,p_version:e.grantVersion,p_paid_through:e.paidThrough,
+      p_period_end:e.currentPeriodEnd,p_status:e.status,p_cancel_at_period_end:e.cancelAtPeriodEnd,p_cancellation_pending:e.cancellationPending,
+    });
+    if (error || typeof data !== 'number') throw new Error('Subscription sync failed');
+    return res.json({accepted:true,grantVersion:data});
+  } catch { return res.status(503).json({error:{code:'subscription_sync_unavailable'}}); }
 });
 
 router.post('/migration/premium-members', requireIvgInternalAuth, async (req, res) => {

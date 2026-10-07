@@ -6,7 +6,7 @@ import { CONTACT_INFO, cn } from '@/lib/utils';
 const questions: { question: string; answer: ReactNode }[] = [
   {
     question: 'What do I get with Premium?',
-    answer: <p>Card checkout starts at €50. Payment gives your CandidFan account lifetime Premium access to full-video downloads. There is no recurring subscription.</p>,
+    answer: <p>Choose €9.99 per month or €50 lifetime access to full-video downloads. Monthly renews every 30 days; cancel renewal with one click on your dashboard and keep access through the paid period. Lifetime is a one-time payment.</p>,
   },
   {
     question: 'Can I preview videos before paying?',

@@ -5,6 +5,7 @@ export function cn(...inputs: ClassValue[]) { return twMerge(clsx(inputs)); }
 export const API_URL = (import.meta.env.VITE_API_URL || '').replace(/\/$/, '');
 export const INSTANTVIDGRAB_URL = (import.meta.env.VITE_INSTANTVIDGRAB_URL || 'https://instantvidgrab.online').replace(/\/$/, '');
 export const INSTANTVIDGRAB_CHECKOUT_ENABLED = import.meta.env.VITE_INSTANTVIDGRAB_CHECKOUT_ENABLED === 'true';
+export const MONTHLY_SUBSCRIPTIONS_ENABLED = import.meta.env.VITE_MONTHLY_SUBSCRIPTIONS_ENABLED === 'true';
 export const GIFT_CARD_LINK = 'https://www.g2a.com/rewarble-visa-gift-card-50-eur-by-rewarble-key-global-i10000502992084?uuid=7f819364-c348-43ae-b186-5f592e8a422e';
 export const CONTACT_INFO = {
   email: 'candidfancom@gmail.com',

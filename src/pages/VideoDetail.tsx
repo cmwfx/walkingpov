@@ -305,7 +305,7 @@ export function VideoDetail() {
                       <Link to="/payment" onClick={() => trackAnalyticsEvent('premium_cta_click', { cta_location: 'download_sidebar' })}>
                         <Button className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all shadow-lg shadow-primary/25">
                           <Crown className="h-4 w-4 mr-2" />
-                          Unlock from €50
+                          Choose monthly or lifetime Premium
                         </Button>
                       </Link>
                     ) : (
@@ -313,7 +313,7 @@ export function VideoDetail() {
                         <Link to="/signup" onClick={() => trackAnalyticsEvent('premium_cta_click', { cta_location: 'download_sidebar' })}>
                           <Button className="w-full h-auto py-4 flex-col gap-1 bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-600/90 transition-all shadow-lg shadow-primary/25">
                             <div className="flex items-center gap-2 font-bold text-lg">
-                              <Crown className="h-5 w-5" /> Get Lifetime Access - €50
+                              <Crown className="h-5 w-5" /> Get Premium — from €9.99 / month
                             </div>
                             <div className="flex items-center gap-2 text-xs opacity-90"><span className="line-through opacity-70">€200</span><span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-bold">75% OFF</span></div>
                           </Button>

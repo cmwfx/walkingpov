@@ -87,11 +87,11 @@ export function HomepageHero({ premiumHref }: HomepageHeroProps) {
 
         <h1 className="mx-auto max-w-5xl text-4xl font-black leading-[1.08] tracking-tight sm:text-5xl md:text-6xl lg:text-7xl">
           2,000+ videos worth over <span className="text-amber-300">€10,000</span>.
-          <span className="mt-2 block">Lifetime access from <span className="text-violet-300">€50.</span></span>
+          <span className="mt-2 block">Lifetime access for <span className="text-violet-300">$30.</span></span>
         </h1>
 
         <p className="mx-auto mt-6 max-w-3xl text-base leading-relaxed text-slate-100 sm:text-lg md:text-xl">
-          One payment, no subscription. That’s 75% off the <span className="text-white/75 line-through">€200</span> price.
+          One payment, no subscription. That’s 75% off the <span className="text-white/75 line-through">$120</span> price.
           Preview the collection and compare the value for yourself.
         </p>
 

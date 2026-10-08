@@ -9,7 +9,7 @@ export const supabase = createClient(url, publishableKey, {
 });
 
 export type MembershipStatus = 'free' | 'pending' | 'premium' | 'denied';
-export type User = { id: string; email: string; membership_status: MembershipStatus; is_admin: boolean; premium_plan?: 'lifetime' | 'monthly' | null };
+export type User = { id: string; email: string; membership_status: MembershipStatus; is_admin: boolean; premium_plan?: 'lifetime' | null };
 export type Video = { id: string; title: string; thumbnail_url: string; tags: string[]; is_featured: boolean; created_at: string; updated_at: string };
 export type VideoPreview = { url: string; sourceDurationSeconds: number; previewDurationSeconds: number; expiresAt: string };
 export type PaymentRequest = { id: string; user_id: string; email: string; proof: string; status: 'pending' | 'approved' | 'denied'; created_at: string; notes?: string | null };

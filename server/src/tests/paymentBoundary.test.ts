@@ -5,11 +5,11 @@ import { test } from 'node:test';
 import { fileURLToPath } from 'node:url';
 
 const sourceExtensions = new Set(['.js', '.jsx', '.ts', '.tsx', '.sql']);
-const forbiddenPaymentProviderPatterns = [
+const forbiddenIntegrationPatterns = [
   /\bwhop\b/i,
   /@whop\//i,
   /whop\.com/i,
-  /whop_payment/i,
+  /instantvidgrab/i,
   /(?:LIVE|SANDBOX)_WHOP_/i,
 ];
 
@@ -21,14 +21,14 @@ async function collectRuntimeFiles(directory: string): Promise<string[]> {
     const entryPath = path.join(directory, entry.name);
     if (entry.isDirectory()) {
       files.push(...await collectRuntimeFiles(entryPath));
-    } else if (sourceExtensions.has(path.extname(entry.name))) {
+    } else if (sourceExtensions.has(path.extname(entry.name)) && !/\.(test|spec)\.[^.]+$/i.test(entry.name)) {
       files.push(entryPath);
     }
   }
   return files;
 }
 
-test('WalkingPOV runtime does not integrate with or expose a payment-provider dependency', async () => {
+test('CandidFan runtime has no direct-card or cross-site checkout integration', async () => {
   const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const productRoot = path.resolve(serverRoot, '..');
   const runtimeRoots = [
@@ -41,7 +41,7 @@ test('WalkingPOV runtime does not integrate with or expose a payment-provider de
 
   for (const filename of runtimeFiles) {
     const source = await readFile(filename, 'utf8');
-    if (forbiddenPaymentProviderPatterns.some((pattern) => pattern.test(source))) {
+    if (forbiddenIntegrationPatterns.some((pattern) => pattern.test(source))) {
       violations.push(path.relative(productRoot, filename));
     }
   }
@@ -49,7 +49,7 @@ test('WalkingPOV runtime does not integrate with or expose a payment-provider de
   assert.deepEqual(violations, []);
 });
 
-test('WalkingPOV packages and environment templates contain no Whop integration', async () => {
+test('CandidFan packages and environment templates contain no cross-site payment integration', async () => {
   const serverRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
   const productRoot = path.resolve(serverRoot, '..');
   const configurationFiles = [
@@ -67,7 +67,7 @@ test('WalkingPOV packages and environment templates contain no Whop integration'
 
   for (const filename of configurationFiles) {
     const source = await readFile(filename, 'utf8');
-    if (forbiddenPaymentProviderPatterns.some((pattern) => pattern.test(source))) {
+    if (forbiddenIntegrationPatterns.some((pattern) => pattern.test(source))) {
       violations.push(path.relative(productRoot, filename));
     }
   }

@@ -7,13 +7,13 @@ const clientIdPattern = /^[0-9]{1,20}\.[0-9]{1,20}$/;
 
 type PurchaseParameters = {
   transaction_id: string;
-  currency: 'EUR';
-  value: 50;
+  currency: 'USD';
+  value: 30;
   engagement_time_msec: 1;
   items: Array<{
     item_id: 'candidfan_lifetime_premium';
     item_name: 'CandidFan Lifetime Premium';
-    price: 50;
+    price: 30;
     quantity: 1;
   }>;
 };
@@ -31,13 +31,13 @@ export function purchaseParameters(paymentRequestId: string): PurchaseParameters
   const transactionId = `cf_${createHash('sha256').update(paymentRequestId).digest('hex').slice(0, 32)}`;
   return {
     transaction_id: transactionId,
-    currency: 'EUR',
-    value: 50,
+    currency: 'USD',
+    value: 30,
     engagement_time_msec: 1,
     items: [{
       item_id: 'candidfan_lifetime_premium',
       item_name: 'CandidFan Lifetime Premium',
-      price: 50,
+      price: 30,
       quantity: 1,
     }],
   };

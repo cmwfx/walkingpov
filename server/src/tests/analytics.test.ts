@@ -16,7 +16,8 @@ test('purchase attribution sends the fixed CandidFan offer and a non-identifying
   assert.deepEqual(first, again);
   assert.equal(first.transaction_id.startsWith('cf_'), true);
   assert.equal(first.transaction_id.includes('payment-request-123'), false);
-  assert.equal(first.currency, 'EUR');
-  assert.equal(first.value, 50);
+  assert.equal(first.currency, 'USD');
+  assert.equal(first.value, 30);
+  assert.equal(first.items[0].price, 30);
   assert.equal(first.items[0].item_id, 'candidfan_lifetime_premium');
 });

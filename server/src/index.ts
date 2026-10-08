@@ -8,13 +8,11 @@ import path from 'node:path';
 import { apiLimiter, readApiLimiter } from './middleware/rateLimiter.js';
 import { generateCsrfToken, verifyCsrfToken } from './middleware/csrf.js';
 import { AuthRequest, verifyToken } from './middleware/auth.js';
-import billing from './routes/billing.js';
 import videos from './routes/videos.js';
 import payments from './routes/payments.js';
 import support from './routes/support.js';
 import imports from './routes/imports.js';
 import admin from './routes/admin.js';
-import instantvidgrab from './routes/instantvidgrab.js';
 import { supabaseAdmin } from './config/supabase.js';
 
 const frontendUrl = (process.env.FRONTEND_URL || 'http://localhost:5173').replace(/\/$/, '');
@@ -84,8 +82,6 @@ export function createApp() {
   app.use('/api', verifyCsrfToken);
 
   app.get('/api/me', verifyToken, (req: AuthRequest, res) => res.json({ user: req.user }));
-  app.use('/api/integrations/instantvidgrab', instantvidgrab);
-  app.use('/api/billing', billing);
   app.use('/api/videos', videos);
   app.use('/api/payments', payments);
   app.use('/api/support', support);

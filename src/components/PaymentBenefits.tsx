@@ -1,12 +1,12 @@
-import { Download, Infinity as InfinityIcon, Sparkles, Video } from 'lucide-react';
+import { Download, Infinity as InfinityIcon, Video } from 'lucide-react';
 
-export function PaymentBenefits({ cardCheckoutEnabled, tier = 'lifetime' }: { cardCheckoutEnabled: boolean; tier?: 'lifetime'|'monthly' }) {
-  const benefits = [
-    { icon: Download, title: 'Full-video downloads', description: 'Save complete videos from the Premium library.' },
-    { icon: Video, title: 'The full Premium library', description: 'Explore the collection and download the videos you want.' },
-    { icon: InfinityIcon, title: tier === 'monthly' ? 'Flexible monthly access' : 'Lifetime membership', description: tier === 'monthly' ? 'Stop renewal with one click. Access stays active through the paid period.' : 'One upgrade. No monthly bills or recurring subscription.' },
-    ...(cardCheckoutEnabled ? [{ icon: Sparkles, title: 'InstantVidGrab included', description: tier === 'monthly' ? 'InstantVidGrab access is included while your subscription is paid.' : 'Card checkout also includes lifetime InstantVidGrab access.' }] : []),
-  ];
+const benefits = [
+  { icon: Download, title: 'Full-video downloads', description: 'Save complete videos from the Premium library.' },
+  { icon: Video, title: 'The full Premium library', description: 'Explore the collection and download the videos you want.' },
+  { icon: InfinityIcon, title: 'Lifetime membership', description: 'One $30 payment. No monthly bills or recurring subscription.' },
+];
+
+export function PaymentBenefits() {
   return (
     <section aria-labelledby="payment-benefits-heading">
       <h2 id="payment-benefits-heading" className="text-xl font-semibold tracking-tight text-white sm:text-2xl">More to enjoy. Yours to download.</h2>

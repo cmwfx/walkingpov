@@ -86,7 +86,7 @@ export function Signup() {
           </div>
           <CardTitle className="text-2xl text-center">Create your account</CardTitle>
           <CardDescription className="text-center">
-            Create your CandidFan account. Card checkout starts at €50. A €50 REWARBLE VISA gift card is also accepted.
+            Create your CandidFan account. Lifetime Premium is $30, paid by REWARBLE VISA gift card.
           </CardDescription>
         </CardHeader>
         <CardContent>

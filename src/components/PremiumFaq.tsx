@@ -4,38 +4,12 @@ import { Link } from 'react-router-dom';
 import { CONTACT_INFO, cn } from '@/lib/utils';
 
 const questions: { question: string; answer: ReactNode }[] = [
-  {
-    question: 'What do I get with Premium?',
-    answer: <p>Choose €9.99 per month or €50 lifetime access to full-video downloads. Monthly renews every 30 days; cancel renewal with one click on your dashboard and keep access through the paid period. Lifetime is a one-time payment.</p>,
-  },
-  {
-    question: 'Can I preview videos before paying?',
-    answer: <p>Where a preview is available, you can watch the first 10 seconds for free. Videos without a processed preview continue to show their thumbnail.</p>,
-  },
-  {
-    question: 'Can I pay by card?',
-    answer: <p>Yes. Choose the secure card checkout on the payment page. The €50 price is shown before you pay. Once verified, payment activates CandidFan Premium and lifetime InstantVidGrab access. REWARBLE VISA gift-card payment remains available as a fallback and is reviewed manually.</p>,
-  },
-  {
-    question: 'How do I buy and submit the gift-card code?',
-    answer: <p>Sign in to your CandidFan account, choose gift-card payment on the payment page, buy a €50 REWARBLE VISA gift card, then enter its code and select Submit Payment.</p>,
-  },
-  {
-    question: 'How long does payment review take?',
-    answer: <p>Gift-card submissions are reviewed manually {CONTACT_INFO.reviewTime}. We email you when the review is complete; if approved, Premium access is activated on your account.</p>,
-  },
-  {
-    question: 'What if my payment is pending or I have a problem?',
-    answer: (
-      <p>
-        Don’t submit the code again while your payment is under review. If your code is rejected or you need help, <Link to="/support" className="font-medium text-primary underline underline-offset-4">open a private support ticket</Link> while signed in, or email <a href={`mailto:${CONTACT_INFO.email}`} className="font-medium text-primary underline underline-offset-4">{CONTACT_INFO.email}</a>.
-      </p>
-    ),
-  },
-  {
-    question: 'Can I get a refund?',
-    answer: <p>Refund requests for CandidFan access are considered case by case. The gift card is purchased through an external retailer, so refunds for the card purchase follow that retailer’s policy.</p>,
-  },
+  { question: 'What do I get with Premium?', answer: <p>One-time $30 lifetime access to full-video downloads from the CandidFan Premium library.</p> },
+  { question: 'Can I preview videos before paying?', answer: <p>Where a preview is available, you can watch the first 10 seconds for free. Videos without a processed preview continue to show their thumbnail.</p> },
+  { question: 'How do I buy and submit the gift-card code?', answer: <p>Sign in to your CandidFan account, open the payment page, buy a $30 REWARBLE VISA gift card, then enter its code and select Submit gift-card code.</p> },
+  { question: 'How long does payment review take?', answer: <p>Gift-card submissions are reviewed {CONTACT_INFO.reviewTime}. We email you when the review is complete; if approved, Premium access is activated on your account.</p> },
+  { question: 'What if my payment is pending or I have a problem?', answer: <p>Do not submit the code again while your payment is under review. If your code is rejected or you need help, <Link to="/support" className="font-medium text-primary underline underline-offset-4">open a private support ticket</Link> while signed in, or email <a href={`mailto:${CONTACT_INFO.email}`} className="font-medium text-primary underline underline-offset-4">{CONTACT_INFO.email}</a>.</p> },
+  { question: 'Can I get a refund?', answer: <p>Refund requests for CandidFan access are considered case by case. The gift card is purchased through an external retailer, so refunds for the card purchase follow that retailer's policy.</p> },
 ];
 
 export function PremiumFaq({ className }: { className?: string }) {

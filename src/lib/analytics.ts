@@ -1,8 +1,6 @@
 export const GA_MEASUREMENT_ID = 'G-2G7MG61YH5';
 
 type AnalyticsEvent =
-  | 'pricing_plan_selected'
-  | 'subscription_cancel_succeeded'
   | 'page_view'
   | 'video_detail_view'
   | 'preview_start'
@@ -13,8 +11,6 @@ type AnalyticsEvent =
   | 'sign_up'
   | 'email_verified'
   | 'login'
-  | 'begin_checkout'
-  | 'card_checkout_outbound_click'
   | 'gift_card_outbound_click'
   | 'payment_proof_submitted';
 

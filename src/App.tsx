@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { Layout } from './components/Layout';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -19,7 +19,6 @@ import { ReviewPayments } from './pages/admin/ReviewPayments';
 import { AdminSupport } from './pages/admin/AdminSupport';
 import { ImportJobs } from './pages/admin/ImportJobs';
 import { PrivacyPolicy } from './pages/PrivacyPolicy';
-import { InstantVidGrabAuthorize } from './pages/InstantVidGrabAuthorize';
 import { trackPageView } from './lib/analytics';
 
 function AnalyticsRouteTracker() {
@@ -44,7 +43,7 @@ export default function App() {
     <Route path="/reset-password" element={<ResetPassword />} />
     <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
     <Route path="/payment" element={<ProtectedRoute><PaymentSubmit /></ProtectedRoute>} />
-    <Route path="/instantvidgrab/authorize" element={<InstantVidGrabAuthorize />} />
+    <Route path="/payments" element={<Navigate to="/payment" replace />} />
     <Route path="/support" element={<ProtectedRoute><Support /></ProtectedRoute>} />
     <Route path="/support/:id" element={<ProtectedRoute><SupportTicket /></ProtectedRoute>} />
     <Route path="/admin" element={<ProtectedRoute adminOnly><AdminDashboard /></ProtectedRoute>} />

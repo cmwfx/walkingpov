@@ -1,12 +1,12 @@
-import { supabaseAdmin } from '../config/supabase.js';
-import { derivePremiumPlan } from './membershipPlan.js';
-export async function effectiveMembership(userId: string, storedStatus: 'free'|'pending'|'premium'|'denied') {
-  const {data,error} = await supabaseAdmin.from('ivg_access_grants').select('state, source_type, expires_at').eq('user_id',userId).eq('product','walkingpov');
-  if (error) throw error;
-  const plan = derivePremiumPlan(data ?? []);
-  if (plan) return {membership_status:'premium' as const,premium_plan:plan};
-  // Legacy profile-only accounts remain supported; subscription-backed profiles
-  // cannot retain Premium after their last grant expires.
-  if (!data?.length && storedStatus === 'premium') return {membership_status:'premium' as const,premium_plan:'lifetime' as const};
-  return {membership_status:storedStatus === 'premium' ? 'free' as const : storedStatus,premium_plan:null};
+export type StoredMembershipStatus = 'free' | 'pending' | 'premium' | 'denied';
+
+/**
+ * CandidFan's users row is the canonical membership source. The old IVG grants
+ * are retained for audit, but are intentionally not queried by runtime code.
+ */
+export function effectiveMembership(storedStatus: StoredMembershipStatus) {
+  return {
+    membership_status: storedStatus,
+    premium_plan: storedStatus === 'premium' ? 'lifetime' as const : null,
+  };
 }

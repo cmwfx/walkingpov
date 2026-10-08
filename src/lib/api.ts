@@ -38,9 +38,6 @@ async function request<T>(pathname: string, init: RequestInit = {}, authenticate
 }
 
 export const getMe = () => request<{ user: import('./supabase').User }>('/api/me', {}, true);
-export type BillingSummary = { plan: 'monthly' | 'lifetime' | null; subscription: null | {status:string; paidThrough:string|null; currentPeriodEnd:string|null; cancelAtPeriodEnd:boolean; cancellationPending:boolean; priceMinor:number; currency:string} };
-export const getSubscription = () => request<BillingSummary>('/api/billing/subscription',{},true);
-export const cancelSubscription = () => request<{cancelled:true}>('/api/billing/subscription/cancel',{method:'POST',body:'{}'},true);
 export const getVideos = (page = 1, tag = '') => request<{ videos: import('./supabase').Video[]; pagination: { page: number; total: number; totalPages: number } }>(`/api/videos?page=${page}${tag ? `&tag=${encodeURIComponent(tag)}` : ''}`);
 export const getVideo = (id: string) => request<import('./supabase').Video>(`/api/videos/${encodeURIComponent(id)}`);
 export const getVideoPreview = (id: string) => request<import('./supabase').VideoPreview>(`/api/videos/${encodeURIComponent(id)}/preview`);
@@ -61,7 +58,6 @@ export async function updateVideoThumbnail(id: string, file: File) {
 }
 export const setVideoFeatured = (id: string, is_featured: boolean) => request<{ is_featured: boolean }>(`/api/admin/videos/${encodeURIComponent(id)}/featured`, { method: 'POST', body: JSON.stringify({ is_featured }) }, true);
 export const submitPayment = (proof: string, gaClientId: string | null = null) => request('/api/payments/submit', { method: 'POST', body: JSON.stringify({ proof, gaClientId }) }, true);
-export const authorizeInstantVidGrab = (input: { state: string; challenge: string; intent: 'checkout' | 'download' | 'connect'; selectedVideoId?: string }) => request<{ redirect_to: string }>('/api/integrations/instantvidgrab/authorize', { method: 'POST', body: JSON.stringify(input) }, true);
 export const getPaymentRequests = () => request<import('./supabase').PaymentRequest[]>('/api/payments/requests', {}, true);
 export const reviewPayment = (id: string, decision: 'approved' | 'denied', notes: string) => request(`/api/payments/${id}/review`, { method: 'POST', body: JSON.stringify({ decision, notes }) }, true);
 export const getAdminStats = () => request<{ total_videos: number; total_users: number; pending_payments: number; premium_users: number; unread_support: number }>('/api/admin/stats', {}, true);
